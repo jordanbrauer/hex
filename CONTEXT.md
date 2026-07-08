@@ -64,6 +64,18 @@ _Avoid_: VM (implementation detail), Sandbox (implies stronger isolation guarant
 A component that converts hex markup into a target output format (ANSI terminal, plain text, Slack blocks, HTML). Different consumers pick different renderers; the markup is the shared IR.
 _Avoid_: Formatter, Printer (both used elsewhere for different concepts).
 
+**Queue**:
+A named channel to which producers publish byte messages and from which consumers receive them, backed by a durable store (sqlite, redis, sqs) or in-process memory. Distinct from **Bus** (events): the bus is synchronous in-process pub/sub; a queue is asynchronous, durable, and cross-process.
+_Avoid_: Channel (means Go primitive), Topic (used inside a queue to name partitions).
+
+**Topic** (queue):
+A named partition of a Queue that consumers subscribe to independently. Every published message belongs to a topic; a queue backend routes it to zero or more subscribers of that topic.
+_Avoid_: Channel, Subject.
+
+**Job**:
+A typed unit of async work dispatched to a queue. Different from the cron **Job** (which is a scheduled trigger) — a queue job carries a payload, has retry semantics, and is executed by a worker consumer. When both concepts appear together in a codebase, prefer `queue.Job` and `cron.Job` explicitly.
+_Avoid_: Task, Message (a message is the raw envelope; a Job is the structured payload inside it).
+
 **Route** (web):
 An HTTP endpoint registered with the echo server. hex/web owns the server, middleware stack, and lifecycle; consumers own the routes.
 _Avoid_: Endpoint (used for connection targets), Handler (that's the func under the route).
