@@ -51,6 +51,7 @@ import (
 	"strings"
 	"time"
 
+	"cuelang.org/go/cue"
 	"github.com/joho/godotenv"
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
@@ -84,6 +85,28 @@ type Config struct {
 	// EnvFile is an optional path to a .env file loaded before env-var
 	// bindings resolve. Missing files are ignored.
 	EnvFile string
+
+	// Schemas is an optional fs.FS containing CUE schema files. When nil,
+	// Defaults is scanned for schemas instead — the common case where
+	// TOML and schema files live in the same //go:embed'd directory.
+	//
+	// Recognised schemas:
+	//   - schema.cue at the root: whole-tree constraints; top-level
+	//     fields describe each namespace.
+	//   - <namespace>.cue: per-namespace constraints for the same
+	//     namespace as <namespace>.toml. Unified with schema.cue when
+	//     both exist.
+	Schemas fs.FS
+
+	// SchemasDir is the subdirectory within Schemas that holds .cue
+	// files. Empty means the Schemas FS root (or DefaultsDir when Schemas
+	// is unset).
+	SchemasDir string
+
+	// StrictValidation, when true, causes Load to return an error if any
+	// loaded TOML namespace has no matching schema. Off by default —
+	// consumers opt into schemas per-namespace.
+	StrictValidation bool
 }
 
 // Store holds all loaded configuration namespaces. Each namespace is a
@@ -92,6 +115,7 @@ type Config struct {
 // "<namespace>.<key.path>".
 type Store struct {
 	namespaces map[string]*viper.Viper
+	schemas    *schemaSet
 }
 
 // Load builds a Store by scanning cfg.Defaults for TOML files, merging any
@@ -146,7 +170,55 @@ func Load(cfg Config) (*Store, error) {
 		s.namespaces[name] = v
 	}
 
+	if err := s.attachSchemas(cfg); err != nil {
+		return nil, err
+	}
+
 	return s, nil
+}
+
+// attachSchemas loads CUE schemas (per cfg.Schemas / cfg.Defaults) and
+// validates every loaded namespace against its schema. Runs after all
+// TOML + env merging so validation sees the effective values.
+func (s *Store) attachSchemas(cfg Config) error {
+	schemaFS := cfg.Schemas
+	if schemaFS == nil {
+		schemaFS = cfg.Defaults
+	}
+
+	schemaDir := cfg.SchemasDir
+	if schemaDir == "" {
+		schemaDir = cfg.DefaultsDir
+	}
+
+	tomlNS := make(map[string]bool, len(s.namespaces))
+	for ns := range s.namespaces {
+		tomlNS[ns] = true
+	}
+
+	set, err := loadSchemas(schemaFS, schemaDir, tomlNS)
+	if err != nil {
+		return err
+	}
+
+	s.schemas = set
+
+	for ns, v := range s.namespaces {
+		if !set.hasSchema(ns) {
+			if cfg.StrictValidation {
+				return fmt.Errorf("config: strict validation: no schema for namespace %q", ns)
+			}
+
+			continue
+		}
+
+		values := v.AllSettings()
+		if err := set.validate(ns, values); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // loadNamespace loads defaults for one namespace from the embedded FS, merges
@@ -333,6 +405,29 @@ func (s *Store) Has(fullpath string) bool {
 // methods hex does not expose.
 func (s *Store) Viper(namespace string) *viper.Viper {
 	return s.namespaces[namespace]
+}
+
+// Schema returns the merged CUE schema value for a namespace, or the
+// zero cue.Value when no schema was registered. Useful for doc
+// generation or programmatic constraint inspection.
+func (s *Store) Schema(namespace string) cue.Value {
+	return s.schemas.schemaValue(namespace)
+}
+
+// Validate re-runs schema validation against the current in-memory
+// values for a namespace. Runtime overrides via Set() bypass validation
+// by default; call Validate to check them explicitly.
+func (s *Store) Validate(namespace string) error {
+	if s.schemas == nil || !s.schemas.hasSchema(namespace) {
+		return nil
+	}
+
+	v, ok := s.namespaces[namespace]
+	if !ok {
+		return fmt.Errorf("config: unknown namespace %q", namespace)
+	}
+
+	return s.schemas.validate(namespace, v.AllSettings())
 }
 
 // -- Typed accessors -------------------------------------------------------
