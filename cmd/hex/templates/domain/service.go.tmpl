@@ -1,0 +1,41 @@
+package {{.Package}}
+
+import "context"
+
+// Service holds the domain use cases for {{.Name}}. Consumers depend on
+// this concrete type; the Repository interface swaps for tests or
+// alternate storage.
+type Service struct {
+	repo Repository
+}
+
+// NewService wires the Repository into a Service.
+func NewService(repo Repository) *Service {
+	return &Service{repo: repo}
+}
+
+// Get fetches a {{.Name}} by id.
+func (s *Service) Get(ctx context.Context, id string) (*{{.Name}}, error) {
+	return s.repo.Get(ctx, id)
+}
+
+// List returns every {{.Name}}.
+func (s *Service) List(ctx context.Context) ([]*{{.Name}}, error) {
+	return s.repo.List(ctx)
+}
+
+// Create constructs and persists a new {{.Name}}.
+func (s *Service) Create(ctx context.Context, id string) (*{{.Name}}, error) {
+	{{.Package}} := New(id)
+
+	if err := s.repo.Store(ctx, {{.Package}}); err != nil {
+		return nil, err
+	}
+
+	return {{.Package}}, nil
+}
+
+// Delete removes a {{.Name}} by id.
+func (s *Service) Delete(ctx context.Context, id string) error {
+	return s.repo.Delete(ctx, id)
+}

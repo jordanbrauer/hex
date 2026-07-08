@@ -1,0 +1,32 @@
+// Package cli holds this application's cobra command tree.
+package cli
+
+import (
+	"github.com/spf13/cobra"
+
+	"github.com/jordanbrauer/hex"
+	hexcli "github.com/jordanbrauer/hex/cli"
+
+	"{{.ModulePath}}/build"
+)
+
+// Root builds the top-level cobra command wired to app. hex make:command
+// inserts subcommand registrations above the `// hex:commands` marker
+// below. Do not remove the marker.
+func Root(app *hex.App) *cobra.Command {
+	root := hexcli.Root(hexcli.RootOptions{
+		Name:  "{{.BinaryName}}",
+		Short: "{{.Name}}",
+		App:   app,
+	})
+
+	root.AddCommand(hexcli.Version(hexcli.VersionOptions{
+		App: build.Info().Name,
+	}))
+
+	root.AddCommand(
+	// hex:commands
+	)
+
+	return root
+}

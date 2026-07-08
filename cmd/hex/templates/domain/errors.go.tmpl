@@ -1,0 +1,11 @@
+package {{.Package}}
+
+import hexerrors "github.com/jordanbrauer/hex/errors"
+
+// Domain errors for {{.Name}}. Compare with errors.Is:
+//
+//	if errors.Is(err, {{.Package}}.ErrNotFound) { ... }
+var (
+	ErrNotFound = hexerrors.New(hexerrors.CodeNotFound, "{{.Package}} not found")
+	ErrConflict = hexerrors.New(hexerrors.CodeConflict, "{{.Package}} already exists")
+)

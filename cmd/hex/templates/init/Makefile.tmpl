@@ -1,0 +1,33 @@
+BINARY := {{.BinaryName}}
+PACKAGE := ./cmd/$(BINARY)
+
+VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+COMMIT := $(shell git rev-parse HEAD 2>/dev/null || echo unknown)
+DATE := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+
+LDFLAGS := -X {{.ModulePath}}/build.version=$(VERSION) \
+	-X {{.ModulePath}}/build.commit=$(COMMIT) \
+	-X {{.ModulePath}}/build.date=$(DATE)
+
+.PHONY: build test race lint fmt tidy run
+
+build:
+	go build -ldflags "$(LDFLAGS)" -o bin/$(BINARY) $(PACKAGE)
+
+test:
+	go test ./...
+
+race:
+	go test -race ./...
+
+lint:
+	go vet ./...
+
+fmt:
+	gofmt -s -w .
+
+tidy:
+	go mod tidy
+
+run:
+	go run $(PACKAGE)

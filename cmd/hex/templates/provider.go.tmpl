@@ -1,0 +1,29 @@
+package provider
+
+import (
+	"context"
+
+	"github.com/jordanbrauer/hex/provider"
+)
+
+// {{.Name}} is a service provider.
+//
+// Register runs before Boot; use it to bind dependencies in the container.
+// Boot performs any startup work that needs those dependencies resolved
+// (opening connections, starting workers, etc.). Implement Shutdown
+// (satisfies provider.Shutdowner) if the provider owns resources.
+type {{.Name}} struct {
+	provider.Base
+}
+
+// Register wires bindings into the container.
+func (p *{{.Name}}) Register(app provider.Application) error {
+	// TODO: bind dependencies via app.Bind / app.Singleton.
+	return nil
+}
+
+// Boot runs after every provider has been registered.
+func (p *{{.Name}}) Boot(ctx context.Context, app provider.Application) error {
+	// TODO: resolve dependencies and perform startup work.
+	return nil
+}

@@ -1,0 +1,20 @@
+// Package provider registers every hex service provider this app depends
+// on. Order matters — providers are registered and booted in the order
+// they appear here.
+package provider
+
+import "github.com/jordanbrauer/hex"
+
+// Boot appends this application's providers to app. Called from main
+// before app.Bootstrap.
+//
+// hex make:provider inserts new provider registrations above the
+// `// hex:providers` marker below. Do not remove the marker.
+func Boot(app *hex.App) error {
+	return app.Register(
+{{- if ne .Dialect "none" }}
+		&Database{},
+{{- end }}
+		// hex:providers
+	)
+}

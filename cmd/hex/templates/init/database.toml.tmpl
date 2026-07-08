@@ -1,0 +1,14 @@
+{{ if eq .Dialect "sqlite" -}}
+driver = "sqlite"
+dsn    = "./data/{{.BinaryName}}.db"
+
+[pool]
+max_open_conns = 1
+{{- else if eq .Dialect "postgres" -}}
+driver = "postgres"
+dsn    = "postgres://localhost:5432/{{.BinaryName}}?sslmode=disable"
+
+[pool]
+max_open_conns    = 10
+conn_max_lifetime = "1h"
+{{- end }}
