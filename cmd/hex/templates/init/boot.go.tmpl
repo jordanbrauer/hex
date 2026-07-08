@@ -1,6 +1,10 @@
 // Package app wires this application's service providers into the hex
 // kernel. Providers themselves live in the app/provider subpackage;
 // this file lists them in Boot order.
+//
+// Order matters: hex/config's provider must run first so downstream
+// providers can read config.String / config.Int etc. Log follows so
+// its level is set before the rest emit anything.
 package app
 
 import (
@@ -9,15 +13,17 @@ import (
 	"{{.ModulePath}}/app/provider"
 )
 
-// Boot registers every provider with app. Order matters — providers are
-// registered and booted in the order they appear here.
+// Boot registers every provider with kernel. Order matters — providers
+// are registered and booted in the order they appear here.
 //
 // hex make:provider inserts new provider registrations above the
 // `// hex:providers` marker below. Do not remove the marker.
 func Boot(kernel *hex.App) error {
 	return kernel.Register(
+		provider.Config(),
+		provider.Log(),
 {{- if ne .Dialect "none" }}
-		&provider.Database{},
+		provider.Database(),
 {{- end }}
 		// hex:providers
 	)

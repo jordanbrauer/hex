@@ -1,7 +1,6 @@
 package provider
 
 import (
-	"context"
 	"database/sql"
 
 	{{ if eq .Dialect "sqlite" -}}
@@ -10,70 +9,36 @@ import (
 	_ "github.com/lib/pq"
 	{{- end }}
 
-	"github.com/jordanbrauer/hex/container"
-	hexdb "github.com/jordanbrauer/hex/db"
+	dbprovider "github.com/jordanbrauer/hex/db/provider"
 	{{ if eq .Dialect "sqlite" -}}
 	hexsqlite "github.com/jordanbrauer/hex/db/sqlite"
 	{{- else if eq .Dialect "postgres" -}}
 	hexpostgres "github.com/jordanbrauer/hex/db/postgres"
 	{{- end }}
-	"github.com/jordanbrauer/hex/provider"
 
 	"{{.ModulePath}}/database"
 )
 
-// Database opens the primary SQL connection and runs pending migrations.
-// The connection is bound in the container as "db" and can be resolved
-// via container.Must[*sql.DB](app, "db").
-type Database struct {
-	provider.Base
+// Database wires the app's primary SQL connection. All the plumbing
+// (config reading, connection open, pool tuning, migration runner)
+// lives in hex/db/provider — modify by adding hooks below, or by
+// replacing this factory entirely.
+func Database() *dbprovider.Provider {
+	return &dbprovider.Provider{
+		Namespace: "database",
+		Binding:   "db",
+		Migrator: func(db *sql.DB) error {
+			return {{ if eq .Dialect "sqlite" }}hexsqlite{{ else }}hexpostgres{{ end }}.Migrate(db, database.Migrations, database.MigrationsDir)
+		},
 
-	db *sql.DB
-}
-
-// Register binds the database connection lazily. Actual opening happens
-// during Boot.
-func (p *Database) Register(app provider.Application) error {
-	app.Singleton("db", func(*container.Container) (any, error) {
-		return p.db, nil
-	})
-
-	return nil
-}
-
-// Boot opens the connection and runs migrations.
-func (p *Database) Boot(ctx context.Context, app provider.Application) error {
-	conn, err := hexdb.Open(ctx, hexdb.Config{
-		Driver: "{{.Dialect}}",
-		DSN:    "{{ if eq .Dialect "sqlite" }}./data/{{.BinaryName}}.db{{ else }}postgres://localhost:5432/{{.BinaryName}}?sslmode=disable{{ end }}",
-	})
-	if err != nil {
-		return err
+		// BeforeOpen: func(ctx context.Context, cfg hexdb.Config) hexdb.Config {
+		//     cfg.Pragmas = append(cfg.Pragmas, "PRAGMA foreign_keys = ON")
+		//     return cfg
+		// },
+		//
+		// AfterOpen: func(ctx context.Context, db *sql.DB) error {
+		//     // e.g. warm a cache, register listeners
+		//     return nil
+		// },
 	}
-
-	{{ if eq .Dialect "sqlite" -}}
-	if err := hexsqlite.Migrate(conn, database.Migrations, database.MigrationsDir); err != nil {
-		return err
-	}
-	{{- else if eq .Dialect "postgres" -}}
-	if err := hexpostgres.Migrate(conn, database.Migrations, database.MigrationsDir); err != nil {
-		return err
-	}
-	{{- end }}
-
-	p.db = conn
-
-	return nil
 }
-
-// Shutdown closes the connection.
-func (p *Database) Shutdown(ctx context.Context, app provider.Application) error {
-	if p.db == nil {
-		return nil
-	}
-
-	return p.db.Close()
-}
-
-// Compile-time confirmation the provider participates in shutdown.
-var _ provider.Shutdowner = (*Database)(nil)
