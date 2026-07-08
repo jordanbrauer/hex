@@ -1,19 +1,19 @@
 package provider
 
 import (
-	configprovider "github.com/jordanbrauer/hex/config/provider"
+	"github.com/jordanbrauer/hex/config/provider"
 
-	appconfig "{{.ModulePath}}/config"
+	"{{.ModulePath}}/config"
 )
 
 // Config wires the app's configuration. Customise by editing this
 // factory: change the env.yaml path, the user override directory, or
 // swap the whole provider for something bespoke.
-func Config() *configprovider.Provider {
-	return &configprovider.Provider{
-		Defaults:   appconfig.Files,
-		EnvMap:     appconfig.Files,
-		EnvMapFile: appconfig.EnvMapFile,
+func Config() *provider.Provider {
+	return &provider.Provider{
+		Defaults:   config.Files,
+		EnvMap:     config.Files,
+		EnvMapFile: config.EnvMapFile,
 
 		// UserDir: "~/.config/{{.BinaryName}}", // uncomment to layer user overrides
 		// EnvFile: ".env",                       // uncomment to load a .env file

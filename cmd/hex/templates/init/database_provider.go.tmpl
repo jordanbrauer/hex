@@ -9,11 +9,11 @@ import (
 	_ "github.com/lib/pq"
 	{{- end }}
 
-	dbprovider "github.com/jordanbrauer/hex/db/provider"
+	"github.com/jordanbrauer/hex/db/provider"
 	{{ if eq .Dialect "sqlite" -}}
-	hexsqlite "github.com/jordanbrauer/hex/db/sqlite"
+	"github.com/jordanbrauer/hex/db/sqlite"
 	{{- else if eq .Dialect "postgres" -}}
-	hexpostgres "github.com/jordanbrauer/hex/db/postgres"
+	"github.com/jordanbrauer/hex/db/postgres"
 	{{- end }}
 
 	"{{.ModulePath}}/database"
@@ -23,12 +23,12 @@ import (
 // (config reading, connection open, pool tuning, migration runner)
 // lives in hex/db/provider — modify by adding hooks below, or by
 // replacing this factory entirely.
-func Database() *dbprovider.Provider {
-	return &dbprovider.Provider{
+func Database() *provider.Provider {
+	return &provider.Provider{
 		Namespace: "database",
 		Binding:   "db",
 		Migrator: func(db *sql.DB) error {
-			return {{ if eq .Dialect "sqlite" }}hexsqlite{{ else }}hexpostgres{{ end }}.Migrate(db, database.Migrations, database.MigrationsDir)
+			return {{ if eq .Dialect "sqlite" }}sqlite{{ else }}postgres{{ end }}.Migrate(db, database.Migrations, database.MigrationsDir)
 		},
 
 		// BeforeOpen: func(ctx context.Context, cfg hexdb.Config) hexdb.Config {
