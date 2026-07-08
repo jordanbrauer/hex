@@ -206,8 +206,8 @@ func scaffold(cfg initConfig, force bool) error {
 	files := []struct{ template, target string }{
 		{"templates/init/main.go.tmpl", filepath.Join(cfg.Directory, "main.go")},
 		{"templates/init/boot.go.tmpl", filepath.Join(cfg.Directory, "app", "boot.go")},
-		{"templates/init/root.go.tmpl", filepath.Join(cfg.Directory, "cli", "root.go")},
-		{"templates/init/build.go.tmpl", filepath.Join(cfg.Directory, "build", "build.go")},
+		{"templates/init/root.go.tmpl", filepath.Join(cfg.Directory, "app", "command", "root.go")},
+		{"templates/init/build.go.tmpl", filepath.Join(cfg.Directory, "app", "build", "build.go")},
 		{"templates/init/config.toml.tmpl", filepath.Join(cfg.Directory, "config", "app.toml")},
 		{"templates/init/justfile.tmpl", filepath.Join(cfg.Directory, "justfile")},
 		{"templates/init/gitignore.tmpl", filepath.Join(cfg.Directory, ".gitignore")},
