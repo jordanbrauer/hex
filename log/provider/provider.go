@@ -80,11 +80,11 @@ func (p *Provider) Register(app provider.Application) error {
 	hexlog.SetLevel(level)
 
 	if store.Has(ns + ".caller") {
-		hexlog.Init(
-			hexlog.WithLevel(level),
-			hexlog.WithCaller(store.Bool(ns+".caller")),
-			hexlog.WithTimestamp(store.Bool(ns+".timestamp")),
-		)
+		hexlog.SetCaller(store.Bool(ns + ".caller"))
+	}
+
+	if store.Has(ns + ".timestamp") {
+		hexlog.SetTimestamp(store.Bool(ns + ".timestamp"))
 	}
 
 	return nil
