@@ -70,6 +70,11 @@ type Provider struct {
 	// resolve this binding.
 	ProviderBinding string
 
+	// RegistryBinding for the ai.ToolRegistry. Defaults to
+	// "ai.tools". Downstream providers (hex/ai/lua, future MCP
+	// bridges) resolve this to look tools up by name.
+	RegistryBinding string
+
 	// Namespace is the config namespace read for ai settings. Defaults
 	// to "ai".
 	Namespace string
@@ -80,13 +85,18 @@ type Provider struct {
 	// hex/ai/<provider> subpackages they want available.
 	Factories map[string]Factory
 
-	// Tools are attached to the default agent. Consumers can also add
-	// tools after Bootstrap by resolving the agent from the container
-	// and calling agent-specific APIs.
+	// Tools is a shorthand for passing an unnamed ai.MemoryToolRegistry
+	// constructed from these tools. Ignored when Registry is set.
 	Tools []ai.Tool
 
+	// Registry supplies the tools attached to the built agent and is
+	// bound in the container under RegistryBinding so downstream
+	// providers can look tools up by name. Optional; when nil the
+	// provider builds an empty registry (populated from Tools if any).
+	Registry ai.ToolRegistry
+
 	// AgentOptions are appended to the fantasy.NewAgent call verbatim.
-	// System prompt + tools from Tools are already threaded through;
+	// System prompt + tools from Registry are already threaded through;
 	// use this for advanced settings (temperature, top_p, custom stop
 	// conditions, etc.).
 	AgentOptions []fantasy.AgentOption
@@ -98,6 +108,7 @@ type Provider struct {
 
 	agent    ai.Agent
 	provider fantasy.Provider
+	registry ai.ToolRegistry
 }
 
 // Register selects the configured factory, constructs the agent, and
@@ -154,14 +165,25 @@ func (p *Provider) Register(app provider.Application) error {
 		return fmt.Errorf("ai/provider: language model %q: %w", modelID, err)
 	}
 
+	// Resolve the tool registry. If the consumer supplied one, honour
+	// it; otherwise build a memory registry from Tools (which may be
+	// empty).
+	registry := p.Registry
+	if registry == nil {
+		registry = ai.NewToolRegistry(p.Tools...)
+	}
+
+	p.registry = registry
+
 	opts := make([]fantasy.AgentOption, 0, 2+len(p.AgentOptions))
 
 	if sp := store.String(ns + ".system_prompt"); sp != "" {
 		opts = append(opts, ai.WithSystemPrompt(sp))
 	}
 
-	if len(p.Tools) > 0 {
-		opts = append(opts, ai.WithTools(p.Tools...))
+	tools := registry.All()
+	if len(tools) > 0 {
+		opts = append(opts, ai.WithTools(tools...))
 	}
 
 	opts = append(opts, p.AgentOptions...)
@@ -187,10 +209,19 @@ func (p *Provider) Register(app provider.Application) error {
 		return p.provider, nil
 	})
 
+	registryBinding := p.RegistryBinding
+	if registryBinding == "" {
+		registryBinding = "ai.tools"
+	}
+
+	app.Singleton(registryBinding, func(*container.Container) (any, error) {
+		return p.registry, nil
+	})
+
 	hexlog.Info("ai/provider: ready",
 		hexlog.String("provider", name),
 		hexlog.String("model", modelID),
-		hexlog.Int("tools", len(p.Tools)),
+		hexlog.Int("tools", len(tools)),
 	)
 
 	return nil
