@@ -1,0 +1,43 @@
+// Package {{.Dialect}} holds {{.Dialect}}-backed infrastructure adapters.
+package {{.Dialect}}
+
+import (
+	"context"
+	"database/sql"
+
+	"{{.ModulePath}}/domain/{{.Domain}}"
+)
+
+// {{.DomainType}}Repository implements {{.Domain}}.Repository against a
+// {{.Dialect}} database.
+type {{.DomainType}}Repository struct {
+	db *sql.DB
+}
+
+// New{{.DomainType}}Repository wires a {{.DomainType}}Repository to db.
+func New{{.DomainType}}Repository(db *sql.DB) *{{.DomainType}}Repository {
+	return &{{.DomainType}}Repository{db: db}
+}
+
+// Store persists a {{.DomainType}}.
+func (r *{{.DomainType}}Repository) Store(ctx context.Context, {{.Domain}} *{{.Domain}}.{{.DomainType}}) error {
+	panic("not implemented: {{.DomainType}}Repository.Store")
+}
+
+// Get returns the {{.DomainType}} with id, or {{.Domain}}.ErrNotFound.
+func (r *{{.DomainType}}Repository) Get(ctx context.Context, id string) (*{{.Domain}}.{{.DomainType}}, error) {
+	panic("not implemented: {{.DomainType}}Repository.Get")
+}
+
+// List returns every {{.DomainType}}.
+func (r *{{.DomainType}}Repository) List(ctx context.Context) ([]*{{.Domain}}.{{.DomainType}}, error) {
+	panic("not implemented: {{.DomainType}}Repository.List")
+}
+
+// Delete removes the {{.DomainType}} with id.
+func (r *{{.DomainType}}Repository) Delete(ctx context.Context, id string) error {
+	panic("not implemented: {{.DomainType}}Repository.Delete")
+}
+
+// Compile-time confirmation the repository satisfies the domain port.
+var _ {{.Domain}}.Repository = (*{{.DomainType}}Repository)(nil)
