@@ -60,6 +60,18 @@ _Avoid_: Task (too generic), Cron (that's the whole scheduler subsystem).
 A bounded worker pool for running tasks concurrently in-process. Distinct from a **Queue** (no delivery, no persistence, in-memory only) and from **Cron** (no schedule). Backed by alitto/pond.
 _Avoid_: Pool alone can mean database connection pool; refer to those by their concrete type (`*sql.DB`).
 
+**Feature** (bdd):
+A Gherkin `.feature` file describing one or more Scenarios in given/when/then form. Different from `Feature` colloquially (product feature) and from **Flag** (featureflag) which is a runtime toggle.
+_Avoid_: Spec, Test file.
+
+**Scenario** (bdd):
+A single given/when/then example inside a Feature file. Each step in a scenario is matched to a Go step function by expression or regex.
+_Avoid_: Case, Example (though Scenario Outline uses "Examples" for parameter tables).
+
+**Step** (bdd):
+A Go function registered against a Gherkin phrase (`the user is logged in`) that runs when the scenario reaches that line. Distinct from **Job** and **Task** — a step is a test hook, not a unit of work.
+_Avoid_: Handler.
+
 **Tracer** (telemetry):
 An OpenTelemetry tracer that emits spans for a bounded unit of work (usually one instrumented library, package, or component). Consumers request tracers by name from the provider hex/telemetry sets up.
 _Avoid_: Trace (a trace is a tree of spans, not the emitter).
