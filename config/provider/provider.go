@@ -48,6 +48,9 @@ type Provider struct {
 
 // Register loads config and installs it as the package-level default.
 // It also binds *config.Store into the container under "config".
+//
+// The Config passed to config.Load picks up the app's Environment so
+// files matching <ns>.<env>.toml overlay their base counterparts.
 func (p *Provider) Register(app provider.Application) error {
 	cfg := config.Config{
 		Sources:          p.Sources,
@@ -56,6 +59,7 @@ func (p *Provider) Register(app provider.Application) error {
 		EnvMap:           p.EnvMap,
 		EnvMapFile:       p.EnvMapFile,
 		EnvFile:          p.EnvFile,
+		Environment:      string(app.Environment()),
 		StrictValidation: p.StrictValidation,
 	}
 

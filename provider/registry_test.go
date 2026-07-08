@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/jordanbrauer/hex/container"
+	"github.com/jordanbrauer/hex/env"
 	"github.com/jordanbrauer/hex/events"
 	"github.com/jordanbrauer/hex/provider"
 )
@@ -29,6 +30,7 @@ func (a *fakeApp) On(event string, fn events.Subscriber) func() {
 	return a.b.On(event, fn)
 }
 func (a *fakeApp) Emit(event string, data ...any) error { return a.b.Emit(event, data...) }
+func (a *fakeApp) Environment() env.Environment         { return env.Test }
 
 // recorder tracks lifecycle calls for assertion.
 type recorder struct {

@@ -93,6 +93,16 @@ type Config struct {
 	// bindings resolve. Missing files are ignored.
 	EnvFile string
 
+	// Environment, when non-empty, enables overlay files. For a base
+	// namespace file `<name>.toml`, any sibling `<name>.<Environment>.toml`
+	// is loaded and merged over the base. Overlays are picked up from
+	// every Source that contains them.
+	//
+	// Set via the hex/config/provider integration or manually for
+	// tests. Empty Environment disables overlays (only <name>.toml
+	// files are loaded).
+	Environment string
+
 	// StrictValidation, when true, causes Load to return an error if any
 	// loaded TOML namespace has no matching schema. Off by default —
 	// consumers opt into schemas per-namespace.
@@ -156,21 +166,61 @@ func Load(cfg Config) (*Store, error) {
 			return nil, fmt.Errorf("config: read source[%d]: %w", srcIdx, err)
 		}
 
+		// First pass: base namespace files (<name>.toml, no env suffix).
+		// Overlays are collected in a second pass so a source with only
+		// an overlay file (no base) still layers correctly if a prior
+		// source contributed the base.
+		type scanned struct {
+			name     string
+			filename string
+			overlay  bool
+		}
+
+		var bases, overlays []scanned
+
 		for _, entry := range entries {
 			if entry.IsDir() || filepath.Ext(entry.Name()) != ".toml" {
 				continue
 			}
 
-			name := strings.TrimSuffix(entry.Name(), ".toml")
-			if _, seen := namespaceFiles[name]; !seen {
-				discoveredNamespaces = append(discoveredNamespaces, name)
+			stem := strings.TrimSuffix(entry.Name(), ".toml")
+
+			if dot := strings.LastIndex(stem, "."); dot > 0 {
+				// <name>.<env>.toml — overlay. Only include when the
+				// suffix matches the active environment.
+				suffix := stem[dot+1:]
+				if cfg.Environment != "" && suffix == cfg.Environment {
+					overlays = append(overlays, scanned{
+						name:     stem[:dot],
+						filename: entry.Name(),
+						overlay:  true,
+					})
+				}
+
+				continue
 			}
 
-			namespaceFiles[name] = append(namespaceFiles[name], namespaceSource{
+			bases = append(bases, scanned{name: stem, filename: entry.Name()})
+		}
+
+		record := func(sc scanned) {
+			if _, seen := namespaceFiles[sc.name]; !seen {
+				discoveredNamespaces = append(discoveredNamespaces, sc.name)
+			}
+
+			namespaceFiles[sc.name] = append(namespaceFiles[sc.name], namespaceSource{
 				source:   src,
 				dir:      sourcesDir,
-				filename: entry.Name(),
+				filename: sc.filename,
 			})
+		}
+
+		for _, b := range bases {
+			record(b)
+		}
+
+		for _, o := range overlays {
+			record(o)
 		}
 	}
 

@@ -12,6 +12,7 @@ import (
 	"context"
 
 	"github.com/jordanbrauer/hex/container"
+	"github.com/jordanbrauer/hex/env"
 	"github.com/jordanbrauer/hex/events"
 )
 
@@ -27,6 +28,12 @@ type Application interface {
 
 	On(event string, fn events.Subscriber) func()
 	Emit(event string, data ...any) error
+
+	// Environment reports the runtime environment the app is running
+	// in. Providers can consult this to swap driver defaults (memory
+	// backends in tests, real services in production) without waiting
+	// on config layering.
+	Environment() env.Environment
 }
 
 // Service is a service provider. Register runs first for every provider in
