@@ -2,6 +2,7 @@ package config_test
 
 import (
 	"embed"
+	"io/fs"
 	"strings"
 	"testing"
 
@@ -13,8 +14,8 @@ var schemasFS embed.FS
 
 func TestSchema_perNamespaceCueValidatesTOML(t *testing.T) {
 	_, err := config.Load(config.Config{
-		Defaults:    schemasFS,
-		DefaultsDir: "testdata/schemas",
+		Sources:    []fs.FS{schemasFS},
+		SourcesDir: "testdata/schemas",
 	})
 	if err != nil {
 		t.Fatalf("Load with valid data: %v", err)
@@ -25,8 +26,8 @@ func TestSchema_topLevelSchemaValidatesTOML(t *testing.T) {
 	// Only server.toml has a top-level schema.cue field; database has its
 	// own database.cue. Both should validate cleanly on load.
 	s, err := config.Load(config.Config{
-		Defaults:    schemasFS,
-		DefaultsDir: "testdata/schemas",
+		Sources:    []fs.FS{schemasFS},
+		SourcesDir: "testdata/schemas",
 	})
 	if err != nil {
 		t.Fatalf("Load: %v", err)
@@ -45,8 +46,8 @@ func TestSchema_invalidValueFails(t *testing.T) {
 	// Override database.toml at runtime to violate the schema by using
 	// Set — then call Validate explicitly.
 	s, err := config.Load(config.Config{
-		Defaults:    schemasFS,
-		DefaultsDir: "testdata/schemas",
+		Sources:    []fs.FS{schemasFS},
+		SourcesDir: "testdata/schemas",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -68,8 +69,8 @@ func TestSchema_missingSchemaIsOK(t *testing.T) {
 	// The stock testdata (from other tests) has no .cue files. Load with
 	// StrictValidation off should be fine.
 	_, err := config.Load(config.Config{
-		Defaults:    testFS,
-		DefaultsDir: "testdata/defaults",
+		Sources:    []fs.FS{testFS},
+		SourcesDir: "testdata/defaults",
 	})
 	if err != nil {
 		t.Errorf("Load without schemas returned error: %v", err)
@@ -78,8 +79,8 @@ func TestSchema_missingSchemaIsOK(t *testing.T) {
 
 func TestSchema_strictRequiresSchemaForEveryNamespace(t *testing.T) {
 	_, err := config.Load(config.Config{
-		Defaults:         testFS,
-		DefaultsDir:      "testdata/defaults",
+		Sources:          []fs.FS{testFS},
+		SourcesDir:       "testdata/defaults",
 		StrictValidation: true,
 	})
 	if err == nil {
@@ -89,8 +90,8 @@ func TestSchema_strictRequiresSchemaForEveryNamespace(t *testing.T) {
 
 func TestSchema_accessorReturnsSchemaValue(t *testing.T) {
 	s, err := config.Load(config.Config{
-		Defaults:    schemasFS,
-		DefaultsDir: "testdata/schemas",
+		Sources:    []fs.FS{schemasFS},
+		SourcesDir: "testdata/schemas",
 	})
 	if err != nil {
 		t.Fatal(err)

@@ -1,6 +1,7 @@
 package config_test
 
 import (
+	"io/fs"
 	"testing"
 
 	"github.com/jordanbrauer/hex/config"
@@ -41,8 +42,8 @@ func TestPackageLevel_zeroValuesWhenNoDefault(t *testing.T) {
 
 func TestPackageLevel_delegatesToDefault(t *testing.T) {
 	s := load(t, config.Config{
-		Defaults:    testFS,
-		DefaultsDir: "testdata/defaults",
+		Sources:    []fs.FS{testFS},
+		SourcesDir: "testdata/defaults",
 	})
 
 	config.SetDefault(s)
@@ -71,8 +72,8 @@ func TestPackageLevel_delegatesToDefault(t *testing.T) {
 
 func TestPackageLevel_setUpdatesDefault(t *testing.T) {
 	s := load(t, config.Config{
-		Defaults:    testFS,
-		DefaultsDir: "testdata/defaults",
+		Sources:    []fs.FS{testFS},
+		SourcesDir: "testdata/defaults",
 	})
 
 	config.SetDefault(s)

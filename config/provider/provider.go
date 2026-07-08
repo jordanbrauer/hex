@@ -1,17 +1,14 @@
 // Package provider is the default hex/config service provider.
 //
-// It loads embedded defaults + user override files + env.yaml bindings at
+// It loads TOML + CUE files from a caller-supplied set of Sources at
 // Register time, installs the resulting Store as hex/config's package-
 // level default, and binds the *Store into the container under
-// "config".
-//
-// Consumers typically wire this from a small factory in
-// app/provider/config.go rather than instantiating directly, so hooks
-// and paths stay visible in the consumer's repo.
+// "config" so downstream providers can resolve it via
+// container.Make[*config.Store](app, "config").
 package provider
 
 import (
-	"embed"
+	"io/fs"
 
 	"github.com/jordanbrauer/hex/config"
 	"github.com/jordanbrauer/hex/container"
@@ -19,50 +16,50 @@ import (
 )
 
 // Provider loads hex/config and installs it as the package-level default.
-// Register this before any other provider that reads config values via
-// config.String / config.Int / etc.
+// Register this before any other provider that reads config values.
 type Provider struct {
 	provider.Base
 
-	// Defaults is the embed.FS containing baseline TOML files (one per
-	// namespace). Required.
-	Defaults embed.FS
+	// Sources is the ordered layer stack. Framework providers contribute
+	// their own defaults via their exported Configs() fs.FS; the
+	// application's own config directory is typically added last so it
+	// overrides framework defaults.
+	Sources []fs.FS
 
-	// DefaultsDir is the subdirectory within Defaults that holds *.toml.
-	// Empty means the FS root.
-	DefaultsDir string
+	// SourcesDir is the subdirectory scanned within each Source. Empty
+	// means the source's root.
+	SourcesDir string
 
 	// UserDir is an optional on-disk directory holding per-namespace
 	// override files. Missing UserDir is not an error.
 	UserDir string
 
-	// EnvMap is an embed.FS containing the env-var binding YAML.
-	// Optional.
-	EnvMap embed.FS
-
-	// EnvMapFile is the path within EnvMap to the binding YAML. Empty
-	// means no env bindings.
+	// EnvMap / EnvMapFile / EnvFile: env-var binding config. Optional.
+	EnvMap     fs.FS
 	EnvMapFile string
+	EnvFile    string
 
-	// EnvFile is an optional .env file loaded before env-var bindings
-	// resolve. Missing files are ignored.
-	EnvFile string
+	// StrictValidation, when true, requires a CUE schema for every
+	// loaded namespace.
+	StrictValidation bool
 
-	// store is the loaded Store; populated during Register.
 	store *config.Store
 }
 
 // Register loads config and installs it as the package-level default.
 // It also binds *config.Store into the container under "config".
 func (p *Provider) Register(app provider.Application) error {
-	store, err := config.Load(config.Config{
-		Defaults:    p.Defaults,
-		DefaultsDir: p.DefaultsDir,
-		UserDir:     p.UserDir,
-		EnvMap:      p.EnvMap,
-		EnvMapFile:  p.EnvMapFile,
-		EnvFile:     p.EnvFile,
-	})
+	cfg := config.Config{
+		Sources:          p.Sources,
+		SourcesDir:       p.SourcesDir,
+		UserDir:          p.UserDir,
+		EnvMap:           p.EnvMap,
+		EnvMapFile:       p.EnvMapFile,
+		EnvFile:          p.EnvFile,
+		StrictValidation: p.StrictValidation,
+	}
+
+	store, err := config.Load(cfg)
 	if err != nil {
 		return err
 	}

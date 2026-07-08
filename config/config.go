@@ -41,7 +41,6 @@ package config
 
 import (
 	"bytes"
-	"embed"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -59,24 +58,32 @@ import (
 
 // Config configures a Load call.
 type Config struct {
-	// Defaults is an embed.FS containing baseline TOML files, one per
-	// namespace. Every *.toml file found under DefaultsDir becomes a
-	// namespace whose name is the filename minus ".toml".
-	Defaults embed.FS
+	// Sources is an ordered list of fs.FS layers. Each source is scanned
+	// for *.toml + *.cue files; later sources override earlier ones for
+	// the same namespace (for TOML) or unify with them (for CUE).
+	//
+	// Typical ordering:
+	//
+	//	[]fs.FS{
+	//	    hexdb.Configs(),       // framework defaults + schema
+	//	    hexcache.Configs(),
+	//	    appconfig.Files,        // consumer overrides + own schema.cue
+	//	}
+	Sources []fs.FS
 
-	// DefaultsDir is the subdirectory within Defaults to scan. Empty means
-	// the FS root.
-	DefaultsDir string
+	// SourcesDir is the subdirectory scanned within each source. Empty
+	// means the source's root.
+	SourcesDir string
 
 	// UserDir is an optional directory on disk containing user override
-	// files. For each default TOML "<name>.toml", if UserDir contains a
-	// file with the same name, it is merged over the default. Leading ~ in
-	// UserDir is expanded to the user's home directory. Missing UserDir is
-	// not an error.
+	// files. For each namespace <name>, if UserDir contains a matching
+	// <name>.toml it is merged over the layered sources. Leading ~ in
+	// UserDir is expanded to the user's home directory. Missing UserDir
+	// is not an error.
 	UserDir string
 
-	// EnvMap is an embed.FS containing the env-var binding YAML. Optional.
-	EnvMap embed.FS
+	// EnvMap is an fs.FS containing the env-var binding YAML. Optional.
+	EnvMap fs.FS
 
 	// EnvMapFile is the path within EnvMap to the binding YAML. When empty,
 	// no env-var bindings are applied.
@@ -85,23 +92,6 @@ type Config struct {
 	// EnvFile is an optional path to a .env file loaded before env-var
 	// bindings resolve. Missing files are ignored.
 	EnvFile string
-
-	// Schemas is an optional fs.FS containing CUE schema files. When nil,
-	// Defaults is scanned for schemas instead — the common case where
-	// TOML and schema files live in the same //go:embed'd directory.
-	//
-	// Recognised schemas:
-	//   - schema.cue at the root: whole-tree constraints; top-level
-	//     fields describe each namespace.
-	//   - <namespace>.cue: per-namespace constraints for the same
-	//     namespace as <namespace>.toml. Unified with schema.cue when
-	//     both exist.
-	Schemas fs.FS
-
-	// SchemasDir is the subdirectory within Schemas that holds .cue
-	// files. Empty means the Schemas FS root (or DefaultsDir when Schemas
-	// is unset).
-	SchemasDir string
 
 	// StrictValidation, when true, causes Load to return an error if any
 	// loaded TOML namespace has no matching schema. Off by default —
@@ -118,10 +108,11 @@ type Store struct {
 	schemas    *schemaSet
 }
 
-// Load builds a Store by scanning cfg.Defaults for TOML files, merging any
-// matching files from cfg.UserDir, and binding env-var overrides from
-// cfg.EnvMap. Returns an error only for malformed inputs; missing files
-// (user dir absent, no matching overrides, no .env) are not errors.
+// Load builds a Store by walking every cfg.Sources FS in order, merging
+// any user override files from cfg.UserDir, and binding env-var
+// overrides. CUE schemas found in any source are unified per
+// namespace and applied at the end. Missing files (empty source, no
+// user dir, no .env) are not errors.
 func Load(cfg Config) (*Store, error) {
 	if cfg.EnvFile != "" {
 		if err := loadEnvFile(cfg.EnvFile); err != nil {
@@ -141,28 +132,50 @@ func Load(cfg Config) (*Store, error) {
 
 	s := &Store{namespaces: make(map[string]*viper.Viper)}
 
-	dir := cfg.DefaultsDir
-	if dir == "" {
-		dir = "."
+	sourcesDir := cfg.SourcesDir
+	if sourcesDir == "" {
+		sourcesDir = "."
 	}
 
-	entries, err := fs.ReadDir(cfg.Defaults, dir)
-	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return s, nil
-		}
+	// discoveredNamespaces preserves first-seen order across sources so
+	// iteration is deterministic even though the map is not.
+	discoveredNamespaces := []string{}
+	namespaceFiles := map[string][]namespaceSource{}
 
-		return nil, fmt.Errorf("config: read defaults dir: %w", err)
-	}
-
-	for _, entry := range entries {
-		if entry.IsDir() || filepath.Ext(entry.Name()) != ".toml" {
+	for srcIdx, src := range cfg.Sources {
+		if src == nil {
 			continue
 		}
 
-		name := strings.TrimSuffix(entry.Name(), ".toml")
+		entries, err := fs.ReadDir(src, sourcesDir)
+		if err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				continue
+			}
 
-		v, err := loadNamespace(cfg, dir, entry.Name(), userDir, envBindings[name])
+			return nil, fmt.Errorf("config: read source[%d]: %w", srcIdx, err)
+		}
+
+		for _, entry := range entries {
+			if entry.IsDir() || filepath.Ext(entry.Name()) != ".toml" {
+				continue
+			}
+
+			name := strings.TrimSuffix(entry.Name(), ".toml")
+			if _, seen := namespaceFiles[name]; !seen {
+				discoveredNamespaces = append(discoveredNamespaces, name)
+			}
+
+			namespaceFiles[name] = append(namespaceFiles[name], namespaceSource{
+				source:   src,
+				dir:      sourcesDir,
+				filename: entry.Name(),
+			})
+		}
+	}
+
+	for _, name := range discoveredNamespaces {
+		v, err := loadNamespaceLayers(namespaceFiles[name], userDir, envBindings[name])
 		if err != nil {
 			return nil, fmt.Errorf("config: load %s: %w", name, err)
 		}
@@ -177,18 +190,20 @@ func Load(cfg Config) (*Store, error) {
 	return s, nil
 }
 
-// attachSchemas loads CUE schemas (per cfg.Schemas / cfg.Defaults) and
-// validates every loaded namespace against its schema. Runs after all
+// namespaceSource describes one contributor to a namespace's values.
+type namespaceSource struct {
+	source   fs.FS
+	dir      string
+	filename string
+}
+
+// attachSchemas gathers CUE schemas from every configured source and
+// validates each namespace against the unified schema. Runs after all
 // TOML + env merging so validation sees the effective values.
 func (s *Store) attachSchemas(cfg Config) error {
-	schemaFS := cfg.Schemas
-	if schemaFS == nil {
-		schemaFS = cfg.Defaults
-	}
-
-	schemaDir := cfg.SchemasDir
-	if schemaDir == "" {
-		schemaDir = cfg.DefaultsDir
+	dir := cfg.SourcesDir
+	if dir == "" {
+		dir = "."
 	}
 
 	tomlNS := make(map[string]bool, len(s.namespaces))
@@ -196,7 +211,7 @@ func (s *Store) attachSchemas(cfg Config) error {
 		tomlNS[ns] = true
 	}
 
-	set, err := loadSchemas(schemaFS, schemaDir, tomlNS)
+	set, err := loadSchemasFromSources(cfg.Sources, dir, tomlNS)
 	if err != nil {
 		return err
 	}
@@ -221,23 +236,32 @@ func (s *Store) attachSchemas(cfg Config) error {
 	return nil
 }
 
-// loadNamespace loads defaults for one namespace from the embedded FS, merges
-// a matching user override file if present, and installs env-var bindings.
-func loadNamespace(cfg Config, embedDir, filename, userDir string, bindings map[string]string) (*viper.Viper, error) {
+// loadNamespaceLayers loads all sources contributing to a namespace in
+// order (first is lowest priority, last wins), then merges an optional
+// UserDir override, then installs env-var bindings.
+func loadNamespaceLayers(layers []namespaceSource, userDir string, bindings map[string]string) (*viper.Viper, error) {
 	v := viper.New()
 	v.SetConfigType("toml")
 
-	data, err := fs.ReadFile(cfg.Defaults, path.Join(embedDir, filename))
-	if err != nil {
-		return nil, fmt.Errorf("read default: %w", err)
+	for i, layer := range layers {
+		data, err := fs.ReadFile(layer.source, path.Join(layer.dir, layer.filename))
+		if err != nil {
+			return nil, fmt.Errorf("read layer[%d]: %w", i, err)
+		}
+
+		if i == 0 {
+			if err := v.ReadConfig(bytes.NewReader(data)); err != nil {
+				return nil, fmt.Errorf("parse layer[%d]: %w", i, err)
+			}
+		} else {
+			if err := v.MergeConfig(bytes.NewReader(data)); err != nil {
+				return nil, fmt.Errorf("merge layer[%d]: %w", i, err)
+			}
+		}
 	}
 
-	if err := v.ReadConfig(bytes.NewReader(data)); err != nil {
-		return nil, fmt.Errorf("parse default: %w", err)
-	}
-
-	if userDir != "" {
-		userPath := filepath.Join(userDir, filename)
+	if userDir != "" && len(layers) > 0 {
+		userPath := filepath.Join(userDir, layers[0].filename)
 
 		userData, err := os.ReadFile(userPath)
 		switch {

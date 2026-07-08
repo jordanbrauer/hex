@@ -25,18 +25,15 @@ type schemaSet struct {
 	fromFile map[string]string // namespace -> filename that contributed (for error messages)
 }
 
-// loadSchemas walks the config FS looking for a top-level schema.cue and
-// per-namespace <namespace>.cue files. Returns a schemaSet with one
-// entry per namespace that has any schema material.
+// loadSchemasFromSources walks every fs.FS in sources, gathering schema.cue
+// (top-level, per-namespace fields) and <namespace>.cue files. Every
+// contribution is unified per namespace so all layers apply. Returns a
+// schemaSet with one entry per namespace that has any schema material.
 //
 // The set of TOML-declared namespaces is passed in so schemas for
 // unknown namespaces (typos, orphaned files) return an error rather
 // than being silently ignored.
-func loadSchemas(fsys fs.FS, dir string, tomlNamespaces map[string]bool) (*schemaSet, error) {
-	if fsys == nil {
-		return nil, nil
-	}
-
+func loadSchemasFromSources(sources []fs.FS, dir string, tomlNamespaces map[string]bool) (*schemaSet, error) {
 	ctx := cuecontext.New()
 	set := &schemaSet{
 		ctx:      ctx,
@@ -44,29 +41,49 @@ func loadSchemas(fsys fs.FS, dir string, tomlNamespaces map[string]bool) (*schem
 		fromFile: make(map[string]string),
 	}
 
-	// Load top-level schema.cue and split it into per-namespace values.
+	for _, src := range sources {
+		if src == nil {
+			continue
+		}
+
+		if err := absorbSchemas(ctx, set, src, dir); err != nil {
+			return nil, err
+		}
+	}
+
+	if tomlNamespaces != nil {
+		for ns := range set.perNS {
+			if !tomlNamespaces[ns] {
+				return set, fmt.Errorf("config: schema %s references namespace %q with no matching TOML file", set.fromFile[ns], ns)
+			}
+		}
+	}
+
+	return set, nil
+}
+
+// absorbSchemas reads schema.cue and per-namespace *.cue files from a
+// single source, unifying each contribution into set.
+func absorbSchemas(ctx *cue.Context, set *schemaSet, fsys fs.FS, dir string) error {
 	if data, err := readIfExists(fsys, joinPath(dir, schemaFile)); err != nil {
-		return nil, fmt.Errorf("config: read %s: %w", schemaFile, err)
+		return fmt.Errorf("config: read %s: %w", schemaFile, err)
 	} else if data != nil {
 		v := ctx.CompileBytes(data, cue.Filename(schemaFile))
 		if err := v.Err(); err != nil {
-			return nil, fmt.Errorf("config: compile %s: %w", schemaFile, err)
+			return fmt.Errorf("config: compile %s: %w", schemaFile, err)
 		}
 
 		iter, err := v.Fields(cue.Optional(true), cue.Definitions(false))
 		if err != nil {
-			return nil, fmt.Errorf("config: iterate %s: %w", schemaFile, err)
+			return fmt.Errorf("config: iterate %s: %w", schemaFile, err)
 		}
 
 		for iter.Next() {
 			ns := iter.Selector().String()
-			set.perNS[ns] = iter.Value()
-			set.fromFile[ns] = schemaFile
+			mergeSchema(set, ns, iter.Value(), schemaFile)
 		}
 	}
 
-	// Load per-namespace <ns>.cue files, unifying with anything schema.cue
-	// contributed.
 	scanDir := dir
 	if scanDir == "" {
 		scanDir = "."
@@ -75,10 +92,10 @@ func loadSchemas(fsys fs.FS, dir string, tomlNamespaces map[string]bool) (*schem
 	entries, err := fs.ReadDir(fsys, scanDir)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			return set, nil
+			return nil
 		}
 
-		return nil, fmt.Errorf("config: read schema dir: %w", err)
+		return fmt.Errorf("config: read schema dir: %w", err)
 	}
 
 	for _, entry := range entries {
@@ -91,35 +108,32 @@ func loadSchemas(fsys fs.FS, dir string, tomlNamespaces map[string]bool) (*schem
 
 		data, err := fs.ReadFile(fsys, joinPath(dir, name))
 		if err != nil {
-			return nil, fmt.Errorf("config: read %s: %w", name, err)
+			return fmt.Errorf("config: read %s: %w", name, err)
 		}
 
 		v := ctx.CompileBytes(data, cue.Filename(name))
 		if err := v.Err(); err != nil {
-			return nil, fmt.Errorf("config: compile %s: %w", name, err)
+			return fmt.Errorf("config: compile %s: %w", name, err)
 		}
 
-		if existing, ok := set.perNS[ns]; ok {
-			set.perNS[ns] = existing.Unify(v)
-			set.fromFile[ns] = fmt.Sprintf("%s+%s", set.fromFile[ns], name)
-		} else {
-			set.perNS[ns] = v
-			set.fromFile[ns] = name
-		}
+		mergeSchema(set, ns, v, name)
 	}
 
-	// Warn (via error return path) on schemas for namespaces we did not
-	// find TOML for — likely a typo. Only surface when tomlNamespaces
-	// was supplied; when nil, callers do not want this check.
-	if tomlNamespaces != nil {
-		for ns := range set.perNS {
-			if !tomlNamespaces[ns] {
-				return set, fmt.Errorf("config: schema %s references namespace %q with no matching TOML file", set.fromFile[ns], ns)
-			}
-		}
+	return nil
+}
+
+// mergeSchema unifies value into set at ns and updates the source-file
+// tracker for error messages.
+func mergeSchema(set *schemaSet, ns string, value cue.Value, source string) {
+	if existing, ok := set.perNS[ns]; ok {
+		set.perNS[ns] = existing.Unify(value)
+		set.fromFile[ns] = set.fromFile[ns] + "+" + source
+
+		return
 	}
 
-	return set, nil
+	set.perNS[ns] = value
+	set.fromFile[ns] = source
 }
 
 // hasSchema reports whether a schema exists for namespace.
