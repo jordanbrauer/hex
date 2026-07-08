@@ -1,0 +1,21 @@
+package controller
+
+import "github.com/labstack/echo/v4"
+
+// {{.Struct}} handles HTTP requests for the {{.Struct}} resource.
+type {{.Struct}} struct{}
+
+// {{.Constructor}} constructs a {{.Struct}} controller. Add dependencies
+// (repositories, services, etc.) as fields on the struct and thread
+// them in through this constructor's signature.
+func {{.Constructor}}() *{{.Struct}} {
+	return &{{.Struct}}{}
+}
+
+{{ range .Actions -}}
+// {{.Method}} handles {{.Verb}} requests.
+func (c *{{$.Struct}}) {{.Method}}(ctx echo.Context) error {
+	return ctx.String(200, "{{$.Struct}}.{{.Method}}")
+}
+
+{{ end -}}

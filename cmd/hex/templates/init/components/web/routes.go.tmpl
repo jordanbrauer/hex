@@ -1,0 +1,38 @@
+package provider
+
+import (
+	"github.com/jordanbrauer/hex/container"
+	"github.com/jordanbrauer/hex/provider"
+	"github.com/jordanbrauer/hex/web"
+
+	_ "{{.ModulePath}}/app/controller"
+)
+
+// Routes wires application HTTP routes onto the *web.Server registered
+// by the web provider. hex make:controller inserts route
+// registrations above the `// hex:routes` marker below. Do not
+// remove the marker.
+//
+// Routes are attached in Register (not Boot) so every route is bound
+// before web/provider.Boot starts the listener. Registering routes in
+// Boot is undefined behaviour — the listener may already be running.
+type Routes struct {
+	provider.Base
+}
+
+// Register attaches routes to the *web.Server. The web provider must
+// be registered earlier in app/boot.go so its "http" binding is
+// available here.
+func (p *Routes) Register(app provider.Application) error {
+	server, err := container.Make[*web.Server](app, "http")
+	if err != nil {
+		return err
+	}
+
+	e := server.Echo()
+	_ = e // silences the unused warning until the first route is wired
+
+	// hex:routes
+
+	return nil
+}
