@@ -1,16 +1,25 @@
-// Package config loads application configuration from embedded TOML defaults,
+// Package config loads application configuration from embedded TOML files,
 // user override files, and environment variables.
 //
-// The Store is a thin wrapper over Viper that enforces one convention:
-// application configuration is TOML, environment variable bindings are
-// declared in a separate YAML file (a "binding declaration", not app
-// config). See ADR-0005.
+// Each TOML file is a namespace. A file named "database.toml" creates a
+// namespace called "database"; its keys are addressed as
+// `config.String("database.<key.path>")`. This mirrors the pattern used in
+// production by finch-cli and finch-bot.
 //
-// Priority order (highest wins):
+// Priority order for each namespace (highest wins):
 //
-//  1. environment variables (mapped via EnvMap)
-//  2. user config files (Files, later files override earlier)
-//  3. embedded defaults (Defaults + DefaultsDir)
+//  1. environment variables (mapped via env.yaml)
+//  2. user config files with the same filename
+//  3. embedded default TOML files
+//
+// The env.yaml file is a binding declaration, not app config. See ADR-0005.
+// Its top-level keys are namespaces; its leaves map dotted config keys to
+// environment variable names:
+//
+//	database:
+//	  dsn: MYAPP_DATABASE_DSN
+//	log:
+//	  level: MYAPP_LOG_LEVEL
 //
 // Example:
 //
@@ -22,9 +31,12 @@
 //	    DefaultsDir: "defaults",
 //	    EnvMap:      configFS,
 //	    EnvMapFile:  "env.yaml",
-//	    Files:       []string{"~/.config/myapp/config.toml"},
-//	    EnvFile:     ".env",
+//	    UserDir:     "~/.config/myapp",
 //	})
+//	if err != nil { return err }
+//
+//	dsn := store.String("database.dsn")
+//	port := store.Int("server.port")
 package config
 
 import (
@@ -44,74 +56,67 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Config configures a Load call. All fields are optional; the zero value
-// produces an empty Store that reads only from environment variables (if
-// none are mapped, it reads nothing).
+// Config configures a Load call.
 type Config struct {
-	// Files are absolute or ~-prefixed paths to user config TOML files, merged
-	// in order. Missing files are skipped without error; malformed files
-	// return an error.
-	Files []string
-
-	// Defaults is an optional embed.FS containing baseline TOML files.
+	// Defaults is an embed.FS containing baseline TOML files, one per
+	// namespace. Every *.toml file found under DefaultsDir becomes a
+	// namespace whose name is the filename minus ".toml".
 	Defaults embed.FS
 
-	// DefaultsDir is the subdirectory within Defaults to scan for *.toml
-	// files. Empty means the FS root. Every TOML file found is merged into
-	// the store; filenames are informational only.
+	// DefaultsDir is the subdirectory within Defaults to scan. Empty means
+	// the FS root.
 	DefaultsDir string
 
-	// EnvMap is an optional embed.FS containing the env-var binding YAML.
+	// UserDir is an optional directory on disk containing user override
+	// files. For each default TOML "<name>.toml", if UserDir contains a
+	// file with the same name, it is merged over the default. Leading ~ in
+	// UserDir is expanded to the user's home directory. Missing UserDir is
+	// not an error.
+	UserDir string
+
+	// EnvMap is an embed.FS containing the env-var binding YAML. Optional.
 	EnvMap embed.FS
 
 	// EnvMapFile is the path within EnvMap to the binding YAML. When empty,
-	// no env-var bindings are applied. The file format is a nested map from
-	// dotted config key to environment variable name:
-	//
-	//   database:
-	//     dsn: MYAPP_DATABASE_DSN
-	//   server:
-	//     port: MYAPP_PORT
+	// no env-var bindings are applied.
 	EnvMapFile string
 
 	// EnvFile is an optional path to a .env file loaded before env-var
-	// bindings resolve. Missing files are ignored. Existing OS env vars
-	// win over .env (godotenv Load semantics).
+	// bindings resolve. Missing files are ignored.
 	EnvFile string
 }
 
-// Store holds a loaded configuration. It is a thin wrapper over a single
-// *viper.Viper; use Viper() to escape to the underlying instance when
-// necessary.
+// Store holds all loaded configuration namespaces. Each namespace is a
+// separate *viper.Viper with its own defaults, overrides, and env-var
+// bindings. Value access uses dotted paths of the form
+// "<namespace>.<key.path>".
 type Store struct {
-	v *viper.Viper
+	namespaces map[string]*viper.Viper
 }
 
-// Load builds a Store by applying Defaults, then Files, then env-var bindings,
-// in that order. Later sources override earlier ones for the same key.
+// Load builds a Store by scanning cfg.Defaults for TOML files, merging any
+// matching files from cfg.UserDir, and binding env-var overrides from
+// cfg.EnvMap. Returns an error only for malformed inputs; missing files
+// (user dir absent, no matching overrides, no .env) are not errors.
 func Load(cfg Config) (*Store, error) {
-	v := viper.New()
-	v.SetConfigType("toml")
-
-	if err := loadDefaults(v, cfg); err != nil {
-		return nil, fmt.Errorf("config: load defaults: %w", err)
+	if cfg.EnvFile != "" {
+		if err := loadEnvFile(cfg.EnvFile); err != nil {
+			return nil, err
+		}
 	}
 
-	if err := loadFiles(v, cfg.Files); err != nil {
-		return nil, fmt.Errorf("config: load files: %w", err)
+	envBindings, err := loadEnvMap(cfg)
+	if err != nil {
+		return nil, err
 	}
 
-	if err := loadEnv(v, cfg); err != nil {
-		return nil, fmt.Errorf("config: bind env: %w", err)
+	userDir, err := expandHome(cfg.UserDir)
+	if err != nil {
+		return nil, fmt.Errorf("config: expand user dir: %w", err)
 	}
 
-	return &Store{v: v}, nil
-}
+	s := &Store{namespaces: make(map[string]*viper.Viper)}
 
-// loadDefaults reads every *.toml under cfg.DefaultsDir in cfg.Defaults and
-// merges its contents into v. Files are processed in name order for
-// deterministic merge ordering.
-func loadDefaults(v *viper.Viper, cfg Config) error {
 	dir := cfg.DefaultsDir
 	if dir == "" {
 		dir = "."
@@ -119,13 +124,11 @@ func loadDefaults(v *viper.Viper, cfg Config) error {
 
 	entries, err := fs.ReadDir(cfg.Defaults, dir)
 	if err != nil {
-		// An empty embed.FS returns "file does not exist" on ReadDir. Treat
-		// that as "no defaults" rather than an error.
 		if errors.Is(err, fs.ErrNotExist) {
-			return nil
+			return s, nil
 		}
 
-		return err
+		return nil, fmt.Errorf("config: read defaults dir: %w", err)
 	}
 
 	for _, entry := range entries {
@@ -133,100 +136,91 @@ func loadDefaults(v *viper.Viper, cfg Config) error {
 			continue
 		}
 
-		p := path.Join(dir, entry.Name())
+		name := strings.TrimSuffix(entry.Name(), ".toml")
 
-		data, err := fs.ReadFile(cfg.Defaults, p)
+		v, err := loadNamespace(cfg, dir, entry.Name(), userDir, envBindings[name])
 		if err != nil {
-			return fmt.Errorf("read %s: %w", p, err)
+			return nil, fmt.Errorf("config: load %s: %w", name, err)
 		}
 
-		if err := v.MergeConfig(bytes.NewReader(data)); err != nil {
-			return fmt.Errorf("merge %s: %w", p, err)
-		}
+		s.namespaces[name] = v
 	}
 
-	return nil
+	return s, nil
 }
 
-// loadFiles merges each user config file into v, expanding leading ~. Missing
-// files are skipped. Malformed files return an error.
-func loadFiles(v *viper.Viper, files []string) error {
-	for _, f := range files {
-		expanded, err := expandHome(f)
-		if err != nil {
-			return err
-		}
+// loadNamespace loads defaults for one namespace from the embedded FS, merges
+// a matching user override file if present, and installs env-var bindings.
+func loadNamespace(cfg Config, embedDir, filename, userDir string, bindings map[string]string) (*viper.Viper, error) {
+	v := viper.New()
+	v.SetConfigType("toml")
 
-		data, err := os.ReadFile(expanded)
-		if err != nil {
-			if errors.Is(err, fs.ErrNotExist) {
-				continue
-			}
-
-			return fmt.Errorf("read %s: %w", expanded, err)
-		}
-
-		if err := v.MergeConfig(bytes.NewReader(data)); err != nil {
-			return fmt.Errorf("merge %s: %w", expanded, err)
-		}
-	}
-
-	return nil
-}
-
-// loadEnv applies the .env file (if any) and installs env-var bindings from
-// the YAML declaration.
-func loadEnv(v *viper.Viper, cfg Config) error {
-	if cfg.EnvFile != "" {
-		if err := godotenv.Load(cfg.EnvFile); err != nil && !errors.Is(err, fs.ErrNotExist) {
-			// godotenv wraps as *os.PathError; unwrap for the sentinel check.
-			var pathErr *os.PathError
-			if !(errors.As(err, &pathErr) && errors.Is(pathErr.Err, fs.ErrNotExist)) {
-				return fmt.Errorf("load env file %s: %w", cfg.EnvFile, err)
-			}
-		}
-	}
-
-	if cfg.EnvMapFile == "" {
-		return nil
-	}
-
-	data, err := fs.ReadFile(cfg.EnvMap, cfg.EnvMapFile)
+	data, err := fs.ReadFile(cfg.Defaults, path.Join(embedDir, filename))
 	if err != nil {
-		return fmt.Errorf("read env map %s: %w", cfg.EnvMapFile, err)
+		return nil, fmt.Errorf("read default: %w", err)
 	}
 
-	bindings, err := parseEnvMap(data)
-	if err != nil {
-		return fmt.Errorf("parse env map %s: %w", cfg.EnvMapFile, err)
+	if err := v.ReadConfig(bytes.NewReader(data)); err != nil {
+		return nil, fmt.Errorf("parse default: %w", err)
+	}
+
+	if userDir != "" {
+		userPath := filepath.Join(userDir, filename)
+
+		userData, err := os.ReadFile(userPath)
+		switch {
+		case err == nil:
+			if err := v.MergeConfig(bytes.NewReader(userData)); err != nil {
+				return nil, fmt.Errorf("merge user file %s: %w", userPath, err)
+			}
+		case errors.Is(err, fs.ErrNotExist):
+			// no override: fine
+		default:
+			return nil, fmt.Errorf("read user file %s: %w", userPath, err)
+		}
 	}
 
 	for key, envVar := range bindings {
 		if err := v.BindEnv(key, envVar); err != nil {
-			return fmt.Errorf("bind %s → %s: %w", key, envVar, err)
+			return nil, fmt.Errorf("bind %s -> %s: %w", key, envVar, err)
 		}
 	}
 
-	return nil
+	return v, nil
 }
 
-// parseEnvMap flattens the nested YAML into a map of dotted keys to env-var
-// names. This is the format both finch-cli and finch-bot use in production.
-func parseEnvMap(data []byte) (map[string]string, error) {
-	var raw map[string]any
-	if err := yaml.Unmarshal(data, &raw); err != nil {
-		return nil, err
+// loadEnvMap parses cfg.EnvMap/cfg.EnvMapFile and returns a nested map of
+// namespace -> dotted config key -> env var name.
+func loadEnvMap(cfg Config) (map[string]map[string]string, error) {
+	if cfg.EnvMapFile == "" {
+		return nil, nil
 	}
 
-	out := make(map[string]string)
-	flattenEnvMap("", raw, out)
+	data, err := fs.ReadFile(cfg.EnvMap, cfg.EnvMapFile)
+	if err != nil {
+		return nil, fmt.Errorf("config: read env map %s: %w", cfg.EnvMapFile, err)
+	}
+
+	var raw map[string]any
+	if err := yaml.Unmarshal(data, &raw); err != nil {
+		return nil, fmt.Errorf("config: parse env map %s: %w", cfg.EnvMapFile, err)
+	}
+
+	out := make(map[string]map[string]string)
+	for namespace, val := range raw {
+		flat := make(map[string]string)
+		flattenEnvMap("", val, flat)
+
+		if len(flat) > 0 {
+			out[namespace] = flat
+		}
+	}
 
 	return out, nil
 }
 
-// flattenEnvMap walks the parsed YAML tree, joining keys with "." and
-// collecting leaves that are strings. Non-string leaves are ignored — the
-// env-var name must be a string.
+// flattenEnvMap turns a nested YAML branch into dotted keys mapped to env-var
+// names. Non-string leaves are ignored — env-var names must be strings.
 func flattenEnvMap(prefix string, node any, out map[string]string) {
 	switch n := node.(type) {
 	case map[string]any:
@@ -245,9 +239,34 @@ func flattenEnvMap(prefix string, node any, out map[string]string) {
 	}
 }
 
-// expandHome expands a leading ~/ to the user's home directory. Paths not
-// starting with ~/ are returned unchanged.
+// loadEnvFile applies a .env file if present. Missing files are ignored;
+// malformed files return an error. OS env wins over .env.
+func loadEnvFile(pathTo string) error {
+	err := godotenv.Load(pathTo)
+	if err == nil {
+		return nil
+	}
+
+	var pathErr *os.PathError
+
+	if errors.As(err, &pathErr) && errors.Is(pathErr.Err, fs.ErrNotExist) {
+		return nil
+	}
+
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+
+	return fmt.Errorf("config: load env file %s: %w", pathTo, err)
+}
+
+// expandHome expands a leading ~ in p to the user's home directory. Empty p
+// returns empty; p without a leading ~ is returned unchanged.
 func expandHome(p string) (string, error) {
+	if p == "" {
+		return "", nil
+	}
+
 	if !strings.HasPrefix(p, "~/") && p != "~" {
 		return p, nil
 	}
@@ -264,45 +283,155 @@ func expandHome(p string) (string, error) {
 	return filepath.Join(home, p[2:]), nil
 }
 
-// -- Accessors -------------------------------------------------------------
-
-// String returns the string value for key, or "" if unset.
-func (s *Store) String(key string) string { return s.v.GetString(key) }
-
-// Int returns the int value for key, or 0 if unset.
-func (s *Store) Int(key string) int { return s.v.GetInt(key) }
-
-// Bool returns the bool value for key, or false if unset.
-func (s *Store) Bool(key string) bool { return s.v.GetBool(key) }
-
-// Float64 returns the float64 value for key, or 0 if unset.
-func (s *Store) Float64(key string) float64 { return s.v.GetFloat64(key) }
-
-// Duration returns the time.Duration value for key. Viper parses strings like
-// "5s", "1h30m" per time.ParseDuration.
-func (s *Store) Duration(key string) time.Duration { return s.v.GetDuration(key) }
-
-// StringSlice returns the []string value for key, or nil if unset.
-func (s *Store) StringSlice(key string) []string { return s.v.GetStringSlice(key) }
-
-// IsSet reports whether key was explicitly set by any source.
-func (s *Store) IsSet(key string) bool { return s.v.IsSet(key) }
-
-// Unmarshal decodes the value at key into target, which must be a pointer.
-// Passing an empty key unmarshals the entire store.
-func (s *Store) Unmarshal(key string, target any) error {
-	if key == "" {
-		return s.v.Unmarshal(target)
+// source splits a dotted path into (namespace, remaining key). The namespace
+// must be the first segment. Returns an error if the path lacks a "." or
+// the namespace is unknown.
+func (s *Store) source(fullpath string) (*viper.Viper, string, error) {
+	segments := strings.SplitN(fullpath, ".", 2)
+	if len(segments) < 2 {
+		return nil, "", fmt.Errorf("config: path %q missing namespace (expected \"<namespace>.<key>\")", fullpath)
 	}
 
-	return s.v.UnmarshalKey(key, target)
+	v, ok := s.namespaces[segments[0]]
+	if !ok {
+		return nil, "", fmt.Errorf("config: unknown namespace %q", segments[0])
+	}
+
+	return v, segments[1], nil
 }
 
-// Set overrides a value at runtime. Useful for tests; consumer apps should
-// prefer file or env-based configuration.
-func (s *Store) Set(key string, value any) { s.v.Set(key, value) }
+// Namespaces returns the sorted list of loaded namespace names. Useful for
+// diagnostics and for consumers wiring commands like `myapp config list`.
+func (s *Store) Namespaces() []string {
+	out := make([]string, 0, len(s.namespaces))
+	for k := range s.namespaces {
+		out = append(out, k)
+	}
 
-// Viper returns the underlying *viper.Viper. Escape hatch — prefer the typed
-// accessors when possible so consumers can be ported to a different
-// backend later without touching call sites.
-func (s *Store) Viper() *viper.Viper { return s.v }
+	// sort in place; small n, this is fine
+	for i := 1; i < len(out); i++ {
+		for j := i; j > 0 && out[j-1] > out[j]; j-- {
+			out[j-1], out[j] = out[j], out[j-1]
+		}
+	}
+
+	return out
+}
+
+// Has reports whether path resolves to a set value.
+func (s *Store) Has(fullpath string) bool {
+	v, key, err := s.source(fullpath)
+	if err != nil {
+		return false
+	}
+
+	return v.IsSet(key)
+}
+
+// Viper returns the underlying *viper.Viper for a namespace, or nil if the
+// namespace is not loaded. Escape hatch for consumers that need Viper
+// methods hex does not expose.
+func (s *Store) Viper(namespace string) *viper.Viper {
+	return s.namespaces[namespace]
+}
+
+// -- Typed accessors -------------------------------------------------------
+//
+// Each accessor takes a dotted path "<namespace>.<key.path>". Missing values
+// return the zero value. Missing or malformed paths return the zero value —
+// use Has() first when the distinction matters.
+
+// String returns the string at path, or "" if unset or invalid.
+func (s *Store) String(fullpath string) string {
+	v, key, err := s.source(fullpath)
+	if err != nil {
+		return ""
+	}
+
+	return v.GetString(key)
+}
+
+// Int returns the int at path, or 0 if unset or invalid.
+func (s *Store) Int(fullpath string) int {
+	v, key, err := s.source(fullpath)
+	if err != nil {
+		return 0
+	}
+
+	return v.GetInt(key)
+}
+
+// Bool returns the bool at path, or false if unset or invalid.
+func (s *Store) Bool(fullpath string) bool {
+	v, key, err := s.source(fullpath)
+	if err != nil {
+		return false
+	}
+
+	return v.GetBool(key)
+}
+
+// Float64 returns the float64 at path, or 0 if unset or invalid.
+func (s *Store) Float64(fullpath string) float64 {
+	v, key, err := s.source(fullpath)
+	if err != nil {
+		return 0
+	}
+
+	return v.GetFloat64(key)
+}
+
+// Duration returns the time.Duration at path, parsed via time.ParseDuration
+// on strings like "5s" or "1h30m". Zero on error.
+func (s *Store) Duration(fullpath string) time.Duration {
+	v, key, err := s.source(fullpath)
+	if err != nil {
+		return 0
+	}
+
+	return v.GetDuration(key)
+}
+
+// StringSlice returns the []string at path, or nil.
+func (s *Store) StringSlice(fullpath string) []string {
+	v, key, err := s.source(fullpath)
+	if err != nil {
+		return nil
+	}
+
+	return v.GetStringSlice(key)
+}
+
+// Unmarshal decodes the value at path into target (a pointer). To unmarshal
+// an entire namespace, pass "<namespace>".
+func (s *Store) Unmarshal(fullpath string, target any) error {
+	// A bare namespace with no dot decodes the whole namespace.
+	if !strings.Contains(fullpath, ".") {
+		v, ok := s.namespaces[fullpath]
+		if !ok {
+			return fmt.Errorf("config: unknown namespace %q", fullpath)
+		}
+
+		return v.Unmarshal(target)
+	}
+
+	v, key, err := s.source(fullpath)
+	if err != nil {
+		return err
+	}
+
+	return v.UnmarshalKey(key, target)
+}
+
+// Set overrides a value at runtime. Useful for tests; production paths should
+// prefer files or env vars.
+func (s *Store) Set(fullpath string, value any) error {
+	v, key, err := s.source(fullpath)
+	if err != nil {
+		return err
+	}
+
+	v.Set(key, value)
+
+	return nil
+}
