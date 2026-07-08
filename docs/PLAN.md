@@ -41,6 +41,7 @@ hex follows the same playbook as Laravel (`artisan`), Phoenix (`mix phx.gen`), H
 | `hex/tui` | Terminal renderer, markup, console, styles | `tui/{styles,markup,renderer,console,components,wizard}` | ❌ not present |
 | `hex/web` | HTTP server (echo) with standard middleware + graceful shutdown | ❌ not present | `web/*.go` + `bot/provider/web.go` |
 | `hex/lua` | Lua runtime (gopher-lua). No bindings, no plugin system (ADR-0007) | `lib/lua/*.go` | ❌ not present |
+| `hex/queue` | Generic message queue interface + Jobs layer (ADR-0009). Backends: memory, sqlite; later sqs/rabbitmq/kafka | ❌ not present | ❌ not present |
 | **`cmd/hex`** | **Scaffolding CLI (`hex init`, `hex make:*`)** | ❌ manual setup | ❌ manual setup |
 
 ### Out of scope
@@ -1060,7 +1061,14 @@ Runtime-only (ADR-0007): compile, load, execute scripts. No bindings, no plugin 
 **Package:** `hex/lua`
 **Tests:** Script compilation cache, error propagation with Lua stack traces, panic isolation across scripts.
 
-### Phase 11 — hex CLI tool (`hex init` + generators)
+### Phase 11 — Queue
+
+Layered per ADR-0009: generic `Queue` interface (Publish/Subscribe over topic+[]byte) with a `Jobs` layer on top for named jobs with retry/backoff/DLQ/delayed dispatch. Backends in v1: `memory` (in-process, for tests) and `sqlite` (durable, reuses hex/db/sqlite). Postgres, SQS/SNS, RabbitMQ, Kafka land later as opt-in subpackages.
+
+**Packages:** `hex/queue`, `hex/queue/jobs`, `hex/queue/memory`, `hex/queue/sqlite`
+**Tests:** Publish/Subscribe roundtrip, at-least-once delivery semantics, job retry with backoff, dead-letter routing, delayed dispatch, concurrent consumers.
+
+### Phase 12 — hex CLI tool (`hex init` + generators)
 
 The scaffolding CLI itself. This is the user-facing `hex` binary that generates projects and code.
 
@@ -1080,11 +1088,11 @@ The scaffolding CLI itself. This is the user-facing `hex` binary that generates 
 
 **Tests:** Golden file tests — run each generator, compare output against checked-in snapshots. `UPDATE_SNAPSHOTS=true go test ./...` to refresh.
 
-### Phase 12 — Migrate finch-cli
+### Phase 13 — Migrate finch-cli
 
 First real consumer. Replace `app/`, `lib/ioc`, `lib/provider`, `config/repository.go`, `db/connection.go`, `log/log.go` with hex imports and the canonical project structure. This validates both the library API and the generated structure against a real, complex app.
 
-### Phase 13 — Migrate finch-bot
+### Phase 14 — Migrate finch-bot
 
 Second consumer. Replace `lib/ioc`, `lib/provider`, `lib/events`, `bot/bot.go`, `bot/bootstrap.go`, `build/*.go`, `db/connection.go` with hex imports. Validates that the same framework serves both a CLI tool and a long-running service.
 
