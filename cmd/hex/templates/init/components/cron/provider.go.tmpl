@@ -1,0 +1,13 @@
+package provider
+
+import (
+	"github.com/jordanbrauer/hex/cron/provider"
+)
+
+// Cron wires a job scheduler. Resolve the scheduler out of the container
+// (name "scheduler") from another provider's Boot to register jobs.
+func Cron() *provider.Provider {
+	return &provider.Provider{
+		// Options: []cron.Option{cron.WithSeconds()}, // 6-field cron expressions
+	}
+}

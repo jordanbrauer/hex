@@ -1,0 +1,9 @@
+// Package policy owns the embed.FS containing this application's
+// Casbin model and policy files. The policy provider consumes it via
+// policy.Files.
+package policy
+
+import "embed"
+
+//go:embed *.conf *.csv
+var Files embed.FS

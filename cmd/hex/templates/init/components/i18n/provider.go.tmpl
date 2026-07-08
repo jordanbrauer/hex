@@ -1,0 +1,19 @@
+package provider
+
+import (
+	"github.com/jordanbrauer/hex/i18n/provider"
+
+	"{{.ModulePath}}/locales"
+)
+
+// I18n wires the gotext translator, loads embedded PO files, and
+// installs it as hex/i18n's package-level default so i18n.T(...) works
+// everywhere. Add languages by dropping more .po files under
+// locales/<code>/LC_MESSAGES/ and listing the code below.
+func I18n() *provider.Provider {
+	return &provider.Provider{
+		FS:        locales.Files,
+		Languages: []string{"en"},
+		Fallback:  "en",
+	}
+}

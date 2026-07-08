@@ -1,0 +1,17 @@
+package provider
+
+import (
+	"github.com/jordanbrauer/hex/featureflag/provider"
+
+	"{{.ModulePath}}/flags"
+)
+
+// Featureflag wires GOFF, reads the embedded flags.yaml, and installs
+// the client as hex/featureflag's package-level default so
+// featureflag.Bool(...) etc. work everywhere.
+func Featureflag() *provider.Provider {
+	return &provider.Provider{
+		FS:   flags.Files,
+		File: "flags.yaml",
+	}
+}
