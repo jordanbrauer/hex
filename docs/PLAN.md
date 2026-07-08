@@ -55,6 +55,7 @@ hex follows the same playbook as Laravel (`artisan`), Phoenix (`mix phx.gen`), H
 | `hex/httpx` | Outbound HTTP client with retries, backoff, timeout, hex/log integration | ❌ not present | ❌ not present |
 | `hex/validate` | Struct/request validation via zog (Zod-style API) | ❌ not present | ❌ not present |
 | `hex/telemetry` | OpenTelemetry setup (tracer + metrics + log bridge) | ❌ not present | ❌ not present |
+| `hex/bdd` | BDD test runner via gobdd; Gherkin `.feature` support + embed.FS (ADR-0015) | ❌ not present | ❌ not present |
 | **`cmd/hex`** | **Scaffolding CLI (`hex init`, `hex make:*`)** | ❌ manual setup | ❌ manual setup |
 
 ### Out of scope
@@ -1121,7 +1122,13 @@ OpenTelemetry setup wrapper. Provides configured tracer + meter + a logger bridg
 
 **Package:** `hex/telemetry`
 
-### Phase 18 — hex CLI tool (`hex init` + generators)
+### Phase 18 — BDD test support
+
+BDD runner wrapping github.com/go-bdd/gobdd. Type aliases + hex-owned constructors + embed.FS support so consumers can ship `.feature` files inside binaries.
+
+**Package:** `hex/bdd`
+
+### Phase 19 — hex CLI tool (`hex init` + generators)
 
 The scaffolding CLI itself. This is the user-facing `hex` binary that generates projects and code.
 
@@ -1141,11 +1148,11 @@ The scaffolding CLI itself. This is the user-facing `hex` binary that generates 
 
 **Tests:** Golden file tests — run each generator, compare output against checked-in snapshots. `UPDATE_SNAPSHOTS=true go test ./...` to refresh.
 
-### Phase 19 — Migrate finch-cli
+### Phase 20 — Migrate finch-cli
 
 First real consumer. Replace `app/`, `lib/ioc`, `lib/provider`, `config/repository.go`, `db/connection.go`, `log/log.go` with hex imports and the canonical project structure. This validates both the library API and the generated structure against a real, complex app.
 
-### Phase 20 — Migrate finch-bot
+### Phase 21 — Migrate finch-bot
 
 Second consumer. Replace `lib/ioc`, `lib/provider`, `lib/events`, `bot/bot.go`, `bot/bootstrap.go`, `build/*.go`, `db/connection.go` with hex imports. Validates that the same framework serves both a CLI tool and a long-running service.
 

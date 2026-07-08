@@ -146,6 +146,10 @@ github.com/containerd/errdefs/pkg v0.3.0/go.mod h1:NJw6s9HwNuRhnjJhM7pylWwMyAkmC
 github.com/cpuguy83/go-md2man/v2 v2.0.6/go.mod h1:oOW0eioCTA6cOiMLiUPZOpcVxMig6NIQQ7OS05n1F4g=
 github.com/creack/pty v1.1.24 h1:bJrF4RRfyJnbTJqzRLHzcGaZK1NeM5kTC9jGgovnR1s=
 github.com/creack/pty v1.1.24/go.mod h1:08sCNb52WyoAwi2QDyzUCTgcvVFhUzewun7wtTfvcwE=
+github.com/cucumber/gherkin/go/v33 v33.0.0 h1:PqQ81cHjD732/GZ7c/6k/sjlYG4LzLp51nggL6172Sg=
+github.com/cucumber/gherkin/go/v33 v33.0.0/go.mod h1:mnP4fdkoc+LmjSLi9Kq3M5D84GphRWLdgeKAlvUYp2c=
+github.com/cucumber/messages/go/v28 v28.0.0 h1:BOJmy8LKSbdKxM6Ba1v9ZmpZk7j5cyH+LTAaGxMeflc=
+github.com/cucumber/messages/go/v28 v28.0.0/go.mod h1:2njGQBk+mu0aqzQgN8xcXvnrfWNcP7UjEyi1YauQ5Lc=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1VwoXQT9A3Wy9MM3WgvqSxFWenqJduM=
@@ -181,6 +185,8 @@ github.com/fsnotify/fsnotify v1.9.0 h1:2Ml+OJNzbYCTzsxtv8vKSFD9PbJjmhYF14k/jKC7S
 github.com/fsnotify/fsnotify v1.9.0/go.mod h1:8jBTzvmWwFyi3Pb8djgCCO5IBqzKJ/Jwo8TRcHyHii0=
 github.com/fsouza/fake-gcs-server v1.54.0 h1:DGO4EkFVbtP/A5Ha+CAHHx+Xa6O6LeskMB4hQ1wBE48=
 github.com/fsouza/fake-gcs-server v1.54.0/go.mod h1:ryXYE4debQs8GjOxwaOAwFRwM4Cvs6S+NKPPgdVJe6g=
+github.com/go-bdd/gobdd v1.1.4 h1:HCECNRNcqEBqbOVCCT6CP/K0iBkqIxfUwX6e47rI1Lk=
+github.com/go-bdd/gobdd v1.1.4/go.mod h1:CRd+r+YXUzK44n8GxagSEFsIYhd8fl0reKg7AoArUMw=
 github.com/go-jose/go-jose/v4 v4.1.4 h1:moDMcTHmvE6Groj34emNPLs/qtYXRVcd6S7NHbHz3kA=
 github.com/go-jose/go-jose/v4 v4.1.4/go.mod h1:x4oUasVrzR7071A4TnHLGSPpNOm2a21K9Kf04k1rs08=
 github.com/go-logfmt/logfmt v0.6.1 h1:4hvbpePJKnIzH1B+8OR/JPbTx37NktoI9LE2QZBBkvE=
