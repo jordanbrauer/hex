@@ -10,6 +10,10 @@ import (
 
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
+
+	cacheprovider "github.com/jordanbrauer/hex/cache/provider"
+	logprovider "github.com/jordanbrauer/hex/log/provider"
+	webprovider "github.com/jordanbrauer/hex/web/provider"
 )
 
 // initConfig is populated from flags + prompts and threaded into the
@@ -412,6 +416,10 @@ func scaffold(cfg initConfig, force bool) error {
 		}
 	}
 
+	if err := publishFrameworkConfigs(g, cfg); err != nil {
+		return err
+	}
+
 	// Empty directories worth committing.
 	dirs := []string{
 		filepath.Join(cfg.Directory, "domain"),
@@ -437,7 +445,9 @@ type fileSpec struct {
 	template, target string
 }
 
-// coreFiles is the always-generated set.
+// coreFiles is the always-generated set. Log config is not templated;
+// it's published verbatim from hex/log/provider.Configs() by
+// publishFrameworkConfigs.
 func coreFiles(cfg initConfig) []fileSpec {
 	return []fileSpec{
 		{"templates/init/main.go.tmpl", filepath.Join(cfg.Directory, "main.go")},
@@ -445,7 +455,7 @@ func coreFiles(cfg initConfig) []fileSpec {
 		{"templates/init/root.go.tmpl", filepath.Join(cfg.Directory, "app", "command", "root.go")},
 		{"templates/init/build.go.tmpl", filepath.Join(cfg.Directory, "app", "build", "build.go")},
 		{"templates/init/config.toml.tmpl", filepath.Join(cfg.Directory, "config", "app.toml")},
-		{"templates/init/log.toml.tmpl", filepath.Join(cfg.Directory, "config", "log.toml")},
+		{"templates/init/schema.cue.tmpl", filepath.Join(cfg.Directory, "config", "schema.cue")},
 		{"templates/init/config_embed.go.tmpl", filepath.Join(cfg.Directory, "config", "config.go")},
 		{"templates/init/provider_config.go.tmpl", filepath.Join(cfg.Directory, "app", "provider", "config.go")},
 		{"templates/init/provider_log.go.tmpl", filepath.Join(cfg.Directory, "app", "provider", "log.go")},
@@ -455,6 +465,41 @@ func coreFiles(cfg initConfig) []fileSpec {
 		{"templates/init/README.md.tmpl", filepath.Join(cfg.Directory, "README.md")},
 		{"templates/init/go.mod.tmpl", filepath.Join(cfg.Directory, "go.mod")},
 	}
+}
+
+// publishFrameworkConfigs copies the config files that each enabled
+// framework provider ships (via its Configs() fs.FS) into the
+// consumer's config/ directory. Files with per-app content — the
+// database dsn, the telemetry service_name — are still emitted from
+// templates because they need per-app substitution; publish covers
+// the universal-defaults cases.
+func publishFrameworkConfigs(g *generator, cfg initConfig) error {
+	confDir := filepath.Join(cfg.Directory, "config")
+
+	// Log always publishes (log provider is always registered).
+	if _, err := g.publishAll(logprovider.Configs(), ".toml", confDir); err != nil {
+		return err
+	}
+
+	// Cache: universal defaults, no per-app content.
+	if cfg.Cache {
+		if _, err := g.publishAll(cacheprovider.Configs(), ".toml", confDir); err != nil {
+			return err
+		}
+	}
+
+	// Web: universal defaults, no per-app content.
+	if cfg.Web {
+		if _, err := g.publishAll(webprovider.Configs(), ".toml", confDir); err != nil {
+			return err
+		}
+	}
+
+	// CUE schemas are NOT published — they stay in the framework
+	// module's Configs() and are read at runtime via Sources. Consumer
+	// adds their own per-namespace constraints in config/schema.cue.
+
+	return nil
 }
 
 func databaseFiles(cfg initConfig) []fileSpec {
@@ -467,7 +512,11 @@ func databaseFiles(cfg initConfig) []fileSpec {
 	}
 }
 
-// componentFiles returns the templates for an opt-in component.
+// componentFiles returns the templates for an opt-in component. Config
+// TOMLs for cache/web are NOT emitted here — they're published from
+// each framework provider's Configs() in publishFrameworkConfigs.
+// Telemetry and queue keep templated TOMLs because they carry per-app
+// values (service_name / driver choice).
 func componentFiles(name string, cfg initConfig) []fileSpec {
 	base := "templates/init/components/" + name
 	provDir := filepath.Join(cfg.Directory, "app", "provider")
@@ -481,12 +530,8 @@ func componentFiles(name string, cfg initConfig) []fileSpec {
 	// the namespace hex/config parses out (namespace = filename minus
 	// .toml).
 	switch name {
-	case "cache":
-		specs = append(specs, fileSpec{base + "/config.toml.tmpl", filepath.Join(confDir, "cache.toml")})
 	case "queue":
 		specs = append(specs, fileSpec{base + "/config.toml.tmpl", filepath.Join(confDir, "queue.toml")})
-	case "web":
-		specs = append(specs, fileSpec{base + "/config.toml.tmpl", filepath.Join(confDir, "server.toml")})
 	case "telemetry":
 		specs = append(specs, fileSpec{base + "/config.toml.tmpl", filepath.Join(confDir, "telemetry.toml")})
 	}

@@ -1,17 +1,54 @@
 package provider
 
 import (
+	"io/fs"
+
 	"github.com/jordanbrauer/hex/config/provider"
+{{- if .Cache }}
+	cacheprovider "github.com/jordanbrauer/hex/cache/provider"
+{{- end }}
+{{- if .HasDatabase }}
+	dbprovider "github.com/jordanbrauer/hex/db/provider"
+{{- end }}
+	logprovider "github.com/jordanbrauer/hex/log/provider"
+{{- if .HasTelemetry }}
+	telemetryprovider "github.com/jordanbrauer/hex/telemetry/provider"
+{{- end }}
+{{- if .Web }}
+	webprovider "github.com/jordanbrauer/hex/web/provider"
+{{- end }}
 
 	"{{.ModulePath}}/config"
 )
 
-// Config wires the app's configuration. Customise by editing this
-// factory: change the env.yaml path, the user override directory, or
-// swap the whole provider for something bespoke.
+// Config wires the app's configuration.
+//
+// Sources layer earliest-to-latest: framework defaults (from each
+// enabled hex/<pkg>/provider's Configs()) first, then the app's own
+// config/ directory last so the app can override anything.
+//
+// Customise by editing this factory: change the env.yaml path, the
+// user override directory, or add third-party package Configs() to
+// the Sources list.
 func Config() *provider.Provider {
 	return &provider.Provider{
-		Defaults:   config.Files,
+		Sources: []fs.FS{
+			logprovider.Configs(),
+{{- if .HasDatabase }}
+			dbprovider.Configs(),
+{{- end }}
+{{- if .Cache }}
+			cacheprovider.Configs(),
+{{- end }}
+{{- if .Web }}
+			webprovider.Configs(),
+{{- end }}
+{{- if .HasTelemetry }}
+			telemetryprovider.Configs(),
+{{- end }}
+			config.Files,
+		},
+
 		EnvMap:     config.Files,
 		EnvMapFile: config.EnvMapFile,
 

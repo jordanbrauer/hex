@@ -5,7 +5,7 @@ package config
 
 import "embed"
 
-//go:embed *.toml
+//go:embed *.toml *.cue
 var Files embed.FS
 
 // EnvMapFile is the path inside Files to the env-var binding YAML.
