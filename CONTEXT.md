@@ -60,6 +60,22 @@ _Avoid_: Task (too generic), Cron (that's the whole scheduler subsystem).
 A bounded worker pool for running tasks concurrently in-process. Distinct from a **Queue** (no delivery, no persistence, in-memory only) and from **Cron** (no schedule). Backed by alitto/pond.
 _Avoid_: Pool alone can mean database connection pool; refer to those by their concrete type (`*sql.DB`).
 
+**Model** (policy):
+A Casbin model config — the DSL file (`.conf`) that declares request/policy shape, role definitions, matchers, and effect. Models are static (loaded at startup); policies are the dynamic rules evaluated against a model.
+_Avoid_: Schema, Config (used for `hex/config`).
+
+**Policy** (policy):
+A rule row evaluated by an Enforcer against a Model, e.g. `p, alice, data1, read`. Policies live in an Adapter (memory, CSV file, SQL table). Not the same as a **Model** — the model defines the language, policies fill in the rules.
+_Avoid_: Rule (used for validation elsewhere), Grant.
+
+**Adapter** (policy):
+The storage backend for policies. hex/policy ships memory + file adapters; SQL lands later via a subpackage. Different from **Provider** (framework-level lifecycle).
+_Avoid_: Store, Backend.
+
+**Enforcer** (policy):
+A runtime Casbin engine bound to a Model and an Adapter. `enforcer.Enforce(sub, obj, act)` returns whether the tuple is permitted.
+_Avoid_: Guard, Gate (Laravel terminology that does not match Casbin's model).
+
 **Task** (pool):
 A function submitted to a Pool for execution. Different from a queue **Job** (no envelope, no persistence, no retry policy) and from a cron **Job** (no schedule). Runs in a pool worker goroutine.
 _Avoid_: Work, Unit.
