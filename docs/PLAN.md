@@ -46,6 +46,15 @@ hex follows the same playbook as Laravel (`artisan`), Phoenix (`mix phx.gen`), H
 | `hex/policy` | Authorisation via Casbin — model + adapter, ACL/RBAC/ABAC (ADR-0011). Adapters: memory, file; later sql | ❌ not present | ❌ not present |
 | `hex/i18n` | GNU gettext-compatible i18n via gotext + PO files (ADR-0012). Multi-locale Translator + package-level convenience | ❌ not present | ❌ not present |
 | `hex/featureflag` | Feature flags via go-feature-flag (ADR-0013). Retrievers: file, embed.FS | ❌ not present | ❌ not present |
+| `hex/clock` | Injectable time source for testable code | ❌ not present | ❌ not present |
+| `hex/id` | UUID v4/v7 + ULID + KSUID with one consistent surface | ❌ not present | ❌ not present |
+| `hex/errors` | Typed errors with codes + HTTP status mapping | ❌ not present | ❌ not present |
+| `hex/hash` | Password hashing (argon2id) + HMAC signature helpers | ❌ not present | ❌ not present |
+| `hex/retry` | Generic exponential-backoff retry helper | ❌ not present | ❌ not present |
+| `hex/ratelimit` | Token-bucket rate limiter (wraps x/time/rate) | ❌ not present | ❌ not present |
+| `hex/httpx` | Outbound HTTP client with retries, backoff, timeout, hex/log integration | ❌ not present | ❌ not present |
+| `hex/validate` | Struct/request validation via zog (Zod-style API) | ❌ not present | ❌ not present |
+| `hex/telemetry` | OpenTelemetry setup (tracer + metrics + log bridge) | ❌ not present | ❌ not present |
 | **`cmd/hex`** | **Scaffolding CLI (`hex init`, `hex make:*`)** | ❌ manual setup | ❌ manual setup |
 
 ### Out of scope
@@ -1100,7 +1109,19 @@ Feature-flagging via GOFF (ADR-0013). Ships file + embed.FS retrievers in v1; co
 **Package:** `hex/featureflag`
 **Tests:** Bool/Int/String/Float64/JSON variation with default fallback, rule-based targeting, embed.FS retriever, missing flag returns default.
 
-### Phase 16 — hex CLI tool (`hex init` + generators)
+### Phase 16 — Essentials batch
+
+Eight small, mostly-independent packages that batteries-included frameworks ship. Batched because each is under ~200 lines and they share test/doc patterns.
+
+**Packages:** `hex/clock`, `hex/id`, `hex/errors`, `hex/hash`, `hex/retry`, `hex/ratelimit`, `hex/httpx`, `hex/validate`
+
+### Phase 17 — Telemetry
+
+OpenTelemetry setup wrapper. Provides configured tracer + meter + a logger bridge from hex/log so spans carry log correlation.
+
+**Package:** `hex/telemetry`
+
+### Phase 18 — hex CLI tool (`hex init` + generators)
 
 The scaffolding CLI itself. This is the user-facing `hex` binary that generates projects and code.
 
@@ -1120,11 +1141,11 @@ The scaffolding CLI itself. This is the user-facing `hex` binary that generates 
 
 **Tests:** Golden file tests — run each generator, compare output against checked-in snapshots. `UPDATE_SNAPSHOTS=true go test ./...` to refresh.
 
-### Phase 17 — Migrate finch-cli
+### Phase 19 — Migrate finch-cli
 
 First real consumer. Replace `app/`, `lib/ioc`, `lib/provider`, `config/repository.go`, `db/connection.go`, `log/log.go` with hex imports and the canonical project structure. This validates both the library API and the generated structure against a real, complex app.
 
-### Phase 18 — Migrate finch-bot
+### Phase 20 — Migrate finch-bot
 
 Second consumer. Replace `lib/ioc`, `lib/provider`, `lib/events`, `bot/bot.go`, `bot/bootstrap.go`, `build/*.go`, `db/connection.go` with hex imports. Validates that the same framework serves both a CLI tool and a long-running service.
 
