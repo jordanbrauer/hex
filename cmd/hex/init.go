@@ -534,6 +534,13 @@ func componentFiles(name string, cfg initConfig) []fileSpec {
 		specs = append(specs, fileSpec{base + "/config.toml.tmpl", filepath.Join(confDir, "queue.toml")})
 	case "telemetry":
 		specs = append(specs, fileSpec{base + "/config.toml.tmpl", filepath.Join(confDir, "telemetry.toml")})
+	case "web":
+		// Routes provider for app-owned HTTP routes; controllers live
+		// in app/controller/ and are wired via hex make:controller.
+		specs = append(specs,
+			fileSpec{base + "/routes.go.tmpl", filepath.Join(provDir, "routes.go")},
+			fileSpec{"templates/init/controller.go.tmpl", filepath.Join(cfg.Directory, "app", "controller", "controller.go")},
+		)
 	}
 
 	// Extra assets per component.

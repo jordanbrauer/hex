@@ -49,6 +49,9 @@ func Boot(kernel *hex.App) error {
 {{- if .Featureflag }}
 		provider.Featureflag(),
 {{- end }}
+{{- if .Web }}
+		&provider.Routes{},
+{{- end }}
 		// hex:providers
 	)
 }

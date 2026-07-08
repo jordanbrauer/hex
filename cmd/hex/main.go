@@ -49,6 +49,7 @@ func newRoot() *cobra.Command {
 		newMakeMigrationCommand(),
 		newMakeCommandCommand(),
 		newMakeAdapterCommand(),
+		newMakeControllerCommand(),
 	)
 
 	return cmd
