@@ -1,0 +1,10 @@
+driver = "sqlite"
+dsn = "./data/app.db"
+
+[pool]
+max_open_conns = 25
+max_idle_conns = 5
+conn_max_lifetime = "1h"
+conn_max_idle_time = "10m"
+
+pragmas = []
