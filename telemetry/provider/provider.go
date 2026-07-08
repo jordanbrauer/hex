@@ -6,6 +6,9 @@ package provider
 
 import (
 	"context"
+	"embed"
+	"fmt"
+	"io/fs"
 
 	hexbuild "github.com/jordanbrauer/hex/build"
 	"github.com/jordanbrauer/hex/config"
@@ -13,6 +16,20 @@ import (
 	"github.com/jordanbrauer/hex/provider"
 	"github.com/jordanbrauer/hex/telemetry"
 )
+
+//go:embed config
+var configFS embed.FS
+
+// Configs returns the embedded default TOML + CUE files this provider
+// contributes to hex/config. Add it to hex/config.Provider.Sources.
+func Configs() fs.FS {
+	sub, err := fs.Sub(configFS, "config")
+	if err != nil {
+		panic("telemetry/provider: embedded config subdir missing: " + err.Error())
+	}
+
+	return sub
+}
 
 // Provider wires OpenTelemetry into the app.
 type Provider struct {
@@ -48,7 +65,12 @@ func (p *Provider) Boot(ctx context.Context, app provider.Application) error {
 		binding = "telemetry"
 	}
 
-	opts := p.buildOptions()
+	store, err := container.Make[*config.Store](app, "config")
+	if err != nil {
+		return fmt.Errorf("telemetry/provider: resolve config: %w", err)
+	}
+
+	opts := p.buildOptions(store)
 
 	tp, err := telemetry.Setup(ctx, opts)
 	if err != nil {
@@ -72,7 +94,7 @@ func (p *Provider) Shutdown(ctx context.Context, app provider.Application) error
 	return p.tp.Shutdown(ctx)
 }
 
-func (p *Provider) buildOptions() telemetry.Options {
+func (p *Provider) buildOptions(store *config.Store) telemetry.Options {
 	ns := p.Namespace
 	if ns == "" {
 		ns = "telemetry"
@@ -80,21 +102,21 @@ func (p *Provider) buildOptions() telemetry.Options {
 
 	name := p.ServiceName
 	if name == "" {
-		name = config.String(ns + ".service_name")
+		name = store.String(ns + ".service_name")
 	}
 
 	// Version defaults to hex/build's Version so telemetry is auto-tagged
 	// with the build that emitted it. Consumers can override via config.
-	version := config.String(ns + ".service_version")
+	version := store.String(ns + ".service_version")
 	if version == "" {
 		version = hexbuild.Version()
 	}
 
-	env := config.String(ns + ".environment")
+	env := store.String(ns + ".environment")
 
 	exporter := p.ExporterOverride
 	if exporter == 0 {
-		exporter = parseExporter(config.String(ns + ".exporter"))
+		exporter = parseExporter(store.String(ns + ".exporter"))
 	}
 
 	attrs := make(map[string]string)

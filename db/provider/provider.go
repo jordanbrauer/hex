@@ -12,9 +12,10 @@ package provider
 import (
 	"context"
 	"database/sql"
+	"embed"
 	"errors"
 	"fmt"
-	"time"
+	"io/fs"
 
 	"github.com/jordanbrauer/hex/config"
 	"github.com/jordanbrauer/hex/container"
@@ -22,6 +23,20 @@ import (
 	hexlog "github.com/jordanbrauer/hex/log"
 	"github.com/jordanbrauer/hex/provider"
 )
+
+//go:embed config
+var configFS embed.FS
+
+// Configs returns the embedded default TOML + CUE files this provider
+// contributes to hex/config. Add it to hex/config.Provider.Sources.
+func Configs() fs.FS {
+	sub, err := fs.Sub(configFS, "config")
+	if err != nil {
+		panic("db/provider: embedded config subdir missing: " + err.Error())
+	}
+
+	return sub
+}
 
 // Migrator runs schema migrations against sqldb. hex/db/sqlite and
 // hex/db/postgres both expose a Migrate function that satisfies this
@@ -74,7 +89,12 @@ func (p *Provider) Register(app provider.Application) error {
 
 // Boot opens the connection, applies pragmas, and runs the Migrator.
 func (p *Provider) Boot(ctx context.Context, app provider.Application) error {
-	cfg := p.buildConfig()
+	store, err := container.Make[*config.Store](app, "config")
+	if err != nil {
+		return fmt.Errorf("db/provider: resolve config: %w", err)
+	}
+
+	cfg := p.buildConfig(store)
 
 	if p.BeforeOpen != nil {
 		cfg = p.BeforeOpen(ctx, cfg)
@@ -130,29 +150,23 @@ func (p *Provider) Shutdown(ctx context.Context, app provider.Application) error
 	return err
 }
 
-// buildConfig reads the Namespace-scoped values from hex/config into a
-// hexdb.Config.
-func (p *Provider) buildConfig() hexdb.Config {
+// buildConfig reads the Namespace-scoped values from the resolved
+// *config.Store into a hexdb.Config.
+func (p *Provider) buildConfig(store *config.Store) hexdb.Config {
 	ns := p.Namespace
 	if ns == "" {
 		ns = "database"
 	}
 
-	cfg := hexdb.Config{
-		Driver:          config.String(ns + ".driver"),
-		DSN:             config.String(ns + ".dsn"),
-		MaxOpenConns:    config.Int(ns + ".pool.max_open_conns"),
-		MaxIdleConns:    config.Int(ns + ".pool.max_idle_conns"),
-		ConnMaxLifetime: config.Duration(ns + ".pool.conn_max_lifetime"),
-		ConnMaxIdleTime: config.Duration(ns + ".pool.conn_max_idle_time"),
-		Pragmas:         config.StringSlice(ns + ".pragmas"),
+	return hexdb.Config{
+		Driver:          store.String(ns + ".driver"),
+		DSN:             store.String(ns + ".dsn"),
+		MaxOpenConns:    store.Int(ns + ".pool.max_open_conns"),
+		MaxIdleConns:    store.Int(ns + ".pool.max_idle_conns"),
+		ConnMaxLifetime: store.Duration(ns + ".pool.conn_max_lifetime"),
+		ConnMaxIdleTime: store.Duration(ns + ".pool.conn_max_idle_time"),
+		Pragmas:         store.StringSlice(ns + ".pragmas"),
 	}
-
-	// Ensure the driver/DSN error paths run through hex/db.Open so we
-	// get consistent error messages.
-	_ = time.Second // silence unused import when hooks are all nil
-
-	return cfg
 }
 
 // Compile-time confirmation the provider participates in shutdown.

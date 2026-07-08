@@ -11,7 +11,10 @@ package provider
 
 import (
 	"context"
+	"embed"
 	"errors"
+	"fmt"
+	"io/fs"
 	"net/http"
 	"time"
 
@@ -21,6 +24,20 @@ import (
 	"github.com/jordanbrauer/hex/provider"
 	"github.com/jordanbrauer/hex/web"
 )
+
+//go:embed config
+var configFS embed.FS
+
+// Configs returns the embedded default TOML + CUE files this provider
+// contributes to hex/config. Add it to hex/config.Provider.Sources.
+func Configs() fs.FS {
+	sub, err := fs.Sub(configFS, "config")
+	if err != nil {
+		panic("web/provider: embedded config subdir missing: " + err.Error())
+	}
+
+	return sub
+}
 
 // Provider wires a *web.Server into the container.
 type Provider struct {
@@ -52,7 +69,12 @@ func (p *Provider) Register(app provider.Application) error {
 		binding = "http"
 	}
 
-	opts := p.buildOptions()
+	store, err := container.Make[*config.Store](app, "config")
+	if err != nil {
+		return fmt.Errorf("web/provider: resolve config: %w", err)
+	}
+
+	opts := p.buildOptions(store)
 	p.server = web.New(opts)
 
 	if p.Configure != nil {
@@ -115,23 +137,23 @@ func (p *Provider) Shutdown(ctx context.Context, app provider.Application) error
 //	<ns>.idle_timeout, <ns>.health_path, <ns>.ready_path,
 //	<ns>.cors (bool), <ns>.disable_request_id (bool),
 //	<ns>.disable_recover (bool), <ns>.disable_logger (bool)
-func (p *Provider) buildOptions() web.Options {
+func (p *Provider) buildOptions(store *config.Store) web.Options {
 	ns := p.Namespace
 	if ns == "" {
 		ns = "server"
 	}
 
 	opts := web.Options{
-		Address:          fallback(config.String(ns+".address"), p.ExtraOptions.Address),
-		ReadTimeout:      firstDuration(config.Duration(ns+".read_timeout"), p.ExtraOptions.ReadTimeout),
-		WriteTimeout:     firstDuration(config.Duration(ns+".write_timeout"), p.ExtraOptions.WriteTimeout),
-		IdleTimeout:      firstDuration(config.Duration(ns+".idle_timeout"), p.ExtraOptions.IdleTimeout),
-		HealthPath:       fallback(config.String(ns+".health_path"), p.ExtraOptions.HealthPath),
-		ReadyPath:        fallback(config.String(ns+".ready_path"), p.ExtraOptions.ReadyPath),
-		CORS:             config.Bool(ns+".cors") || p.ExtraOptions.CORS,
-		DisableRequestID: config.Bool(ns+".disable_request_id") || p.ExtraOptions.DisableRequestID,
-		DisableRecover:   config.Bool(ns+".disable_recover") || p.ExtraOptions.DisableRecover,
-		DisableLogger:    config.Bool(ns+".disable_logger") || p.ExtraOptions.DisableLogger,
+		Address:          fallback(store.String(ns+".address"), p.ExtraOptions.Address),
+		ReadTimeout:      firstDuration(store.Duration(ns+".read_timeout"), p.ExtraOptions.ReadTimeout),
+		WriteTimeout:     firstDuration(store.Duration(ns+".write_timeout"), p.ExtraOptions.WriteTimeout),
+		IdleTimeout:      firstDuration(store.Duration(ns+".idle_timeout"), p.ExtraOptions.IdleTimeout),
+		HealthPath:       fallback(store.String(ns+".health_path"), p.ExtraOptions.HealthPath),
+		ReadyPath:        fallback(store.String(ns+".ready_path"), p.ExtraOptions.ReadyPath),
+		CORS:             store.Bool(ns+".cors") || p.ExtraOptions.CORS,
+		DisableRequestID: store.Bool(ns+".disable_request_id") || p.ExtraOptions.DisableRequestID,
+		DisableRecover:   store.Bool(ns+".disable_recover") || p.ExtraOptions.DisableRecover,
+		DisableLogger:    store.Bool(ns+".disable_logger") || p.ExtraOptions.DisableLogger,
 
 		// The Configure hook covers structural extras (ReadyFn, custom
 		// CORSConfig, custom Transport). These are not string-typed and

@@ -6,12 +6,30 @@
 package provider
 
 import (
+	"embed"
+	"fmt"
+	"io/fs"
+
 	"github.com/jordanbrauer/hex/cache"
 	"github.com/jordanbrauer/hex/cache/memory"
 	"github.com/jordanbrauer/hex/config"
 	"github.com/jordanbrauer/hex/container"
 	"github.com/jordanbrauer/hex/provider"
 )
+
+//go:embed config
+var configFS embed.FS
+
+// Configs returns the embedded default TOML + CUE files this provider
+// contributes to hex/config. Add it to hex/config.Provider.Sources.
+func Configs() fs.FS {
+	sub, err := fs.Sub(configFS, "config")
+	if err != nil {
+		panic("cache/provider: embedded config subdir missing: " + err.Error())
+	}
+
+	return sub
+}
 
 // Provider binds a cache.Cache into the container.
 type Provider struct {
@@ -42,7 +60,12 @@ func (p *Provider) Register(app provider.Application) error {
 	if p.Backend != nil {
 		p.cache = p.Backend()
 	} else {
-		p.cache = p.buildBackend()
+		store, err := container.Make[*config.Store](app, "config")
+		if err != nil {
+			return fmt.Errorf("cache/provider: resolve config: %w", err)
+		}
+
+		p.cache = p.buildBackend(store)
 	}
 
 	app.Singleton(binding, func(*container.Container) (any, error) {
@@ -52,21 +75,19 @@ func (p *Provider) Register(app provider.Application) error {
 	return nil
 }
 
-// buildBackend consults config to pick a backend. v1 recognises
-// "memory" (default). Unknown drivers fall back to memory with a
-// warning logged by the caller (we cannot log here without importing
-// hex/log; consumers who want stricter behaviour set Backend).
-func (p *Provider) buildBackend() cache.Cache {
+// buildBackend consults the resolved store to pick a backend. v1
+// recognises "memory" (default). Unknown drivers fall back to memory.
+// Consumers wanting stricter behaviour supply the Backend hook.
+func (p *Provider) buildBackend(store *config.Store) cache.Cache {
 	ns := p.Namespace
 	if ns == "" {
 		ns = "cache"
 	}
 
-	switch config.String(ns + ".driver") {
+	switch store.String(ns + ".driver") {
 	case "", "memory":
 		return memory.New()
 	default:
-		// Unknown → memory. Consumer factories can override via Backend.
 		return memory.New()
 	}
 }
