@@ -19,7 +19,7 @@ Scaffolded by [hex](https://github.com/jordanbrauer/hex).
 {{- if ne .Dialect "none" }}
 ├── database/                     # migrations.go + migrations/*.sql
 {{- end }}
-└── Makefile
+└── justfile
 ```
 
 ## Running
@@ -42,5 +42,6 @@ hex make:migration create_users   # database/migrations/<ts>_create_users.{up,do
 ## Build
 
 ```bash
-make build          # produces bin/{{.BinaryName}} with ldflags-populated version info
+just build          # produces bin/{{.BinaryName}} with ldflags-populated version info
+just                # list all recipes
 ```

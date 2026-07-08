@@ -209,7 +209,7 @@ func scaffold(cfg initConfig, force bool) error {
 		{"templates/init/root.go.tmpl", filepath.Join(cfg.Directory, "cli", "root.go")},
 		{"templates/init/build.go.tmpl", filepath.Join(cfg.Directory, "build", "build.go")},
 		{"templates/init/config.toml.tmpl", filepath.Join(cfg.Directory, "config", "app.toml")},
-		{"templates/init/Makefile.tmpl", filepath.Join(cfg.Directory, "Makefile")},
+		{"templates/init/justfile.tmpl", filepath.Join(cfg.Directory, "justfile")},
 		{"templates/init/gitignore.tmpl", filepath.Join(cfg.Directory, ".gitignore")},
 		{"templates/init/env.dist.tmpl", filepath.Join(cfg.Directory, ".env.dist")},
 		{"templates/init/README.md.tmpl", filepath.Join(cfg.Directory, "README.md")},
