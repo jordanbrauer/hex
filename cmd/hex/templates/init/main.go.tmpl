@@ -8,28 +8,26 @@ import (
 	hexcli "github.com/jordanbrauer/hex/cli"
 	hexlog "github.com/jordanbrauer/hex/log"
 
+	"{{.ModulePath}}/app"
 	"{{.ModulePath}}/cli"
-	"{{.ModulePath}}/provider"
 )
 
 func main() {
 	hexlog.Init()
 
-	app := hex.New()
+	kernel := hex.New()
 
-	if err := provider.Boot(app); err != nil {
+	if err := app.Boot(kernel); err != nil {
 		hexlog.Fatal("register providers", "error", err)
 	}
 
 	ctx := context.Background()
 
-	if err := app.Bootstrap(ctx); err != nil {
+	if err := kernel.Bootstrap(ctx); err != nil {
 		hexlog.Fatal("bootstrap", "error", err)
 	}
 
-	defer func() { _ = app.Shutdown(ctx) }()
+	defer func() { _ = kernel.Shutdown(ctx) }()
 
-	root := cli.Root(app)
-
-	os.Exit(hexcli.Execute(root))
+	os.Exit(hexcli.Execute(cli.Root(kernel)))
 }

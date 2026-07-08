@@ -6,15 +6,18 @@ Scaffolded by [hex](https://github.com/jordanbrauer/hex).
 
 ```
 {{.Name}}/
-├── cmd/{{.BinaryName}}/main.go   # entry point
-├── provider/                     # service providers (boot order matters)
+├── main.go                       # entry point
+├── app/
+│   ├── boot.go                   # provider registration order
+│   └── provider/                 # service providers
+├── cli/root.go                   # cobra command tree
 ├── domain/                       # your business logic
 ├── infrastructure/               # driver adapters (SQL repos, HTTP clients)
-├── cli/root.go                   # cobra command tree
+├── lib/                          # local utility packages
 ├── build/                        # build metadata
-├── config/defaults/              # embedded TOML defaults
+├── config/                       # embedded TOML configuration
 {{- if ne .Dialect "none" }}
-├── db/migrations/                # SQL migrations (embed.FS)
+├── database/                     # migrations.go + migrations/*.sql
 {{- end }}
 └── Makefile
 ```
@@ -23,7 +26,7 @@ Scaffolded by [hex](https://github.com/jordanbrauer/hex).
 
 ```bash
 go mod tidy
-go run ./cmd/{{.BinaryName}}
+go run .
 ```
 
 ## Generators
@@ -31,9 +34,9 @@ go run ./cmd/{{.BinaryName}}
 Add code with the `hex` CLI (from the project root):
 
 ```bash
-hex make:provider payments        # provider/payments.go, wired into boot.go
+hex make:provider payments        # app/provider/payments.go, wired into app/boot.go
 hex make:domain user              # domain/user/{user,repository,service,errors}.go
-hex make:migration create_users   # db/migrations/<ts>_create_users.{up,down}.sql
+hex make:migration create_users   # database/migrations/<ts>_create_users.{up,down}.sql
 ```
 
 ## Build

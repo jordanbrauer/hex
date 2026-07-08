@@ -204,14 +204,14 @@ func scaffold(cfg initConfig, force bool) error {
 
 	// Files rendered from templates.
 	files := []struct{ template, target string }{
-		{"templates/init/main.go.tmpl", filepath.Join(cfg.Directory, "cmd", cfg.BinaryName, "main.go")},
-		{"templates/init/boot.go.tmpl", filepath.Join(cfg.Directory, "provider", "boot.go")},
+		{"templates/init/main.go.tmpl", filepath.Join(cfg.Directory, "main.go")},
+		{"templates/init/boot.go.tmpl", filepath.Join(cfg.Directory, "app", "boot.go")},
 		{"templates/init/root.go.tmpl", filepath.Join(cfg.Directory, "cli", "root.go")},
 		{"templates/init/build.go.tmpl", filepath.Join(cfg.Directory, "build", "build.go")},
-		{"templates/init/config.toml.tmpl", filepath.Join(cfg.Directory, "config", "defaults", "app.toml")},
+		{"templates/init/config.toml.tmpl", filepath.Join(cfg.Directory, "config", "app.toml")},
 		{"templates/init/Makefile.tmpl", filepath.Join(cfg.Directory, "Makefile")},
 		{"templates/init/gitignore.tmpl", filepath.Join(cfg.Directory, ".gitignore")},
-		{"templates/init/env.example.tmpl", filepath.Join(cfg.Directory, ".env.example")},
+		{"templates/init/env.dist.tmpl", filepath.Join(cfg.Directory, ".env.dist")},
 		{"templates/init/README.md.tmpl", filepath.Join(cfg.Directory, "README.md")},
 		{"templates/init/go.mod.tmpl", filepath.Join(cfg.Directory, "go.mod")},
 	}
@@ -220,23 +220,23 @@ func scaffold(cfg initConfig, force bool) error {
 		files = append(files,
 			struct{ template, target string }{
 				"templates/init/database_provider.go.tmpl",
-				filepath.Join(cfg.Directory, "provider", "database.go"),
+				filepath.Join(cfg.Directory, "app", "provider", "database.go"),
 			},
 			struct{ template, target string }{
 				"templates/init/database.toml.tmpl",
-				filepath.Join(cfg.Directory, "config", "defaults", "database.toml"),
+				filepath.Join(cfg.Directory, "config", "database.toml"),
 			},
 			struct{ template, target string }{
 				"templates/init/db_migrations.go.tmpl",
-				filepath.Join(cfg.Directory, "db", "migrations.go"),
+				filepath.Join(cfg.Directory, "database", "migrations.go"),
 			},
 			struct{ template, target string }{
 				"templates/init/initial_migration.up.sql.tmpl",
-				filepath.Join(cfg.Directory, "db", "migrations", "00000000000000_init.up.sql"),
+				filepath.Join(cfg.Directory, "database", "migrations", "00000000000000_init.up.sql"),
 			},
 			struct{ template, target string }{
 				"templates/init/initial_migration.down.sql.tmpl",
-				filepath.Join(cfg.Directory, "db", "migrations", "00000000000000_init.down.sql"),
+				filepath.Join(cfg.Directory, "database", "migrations", "00000000000000_init.down.sql"),
 			},
 		)
 	}
@@ -251,10 +251,7 @@ func scaffold(cfg initConfig, force bool) error {
 	dirs := []string{
 		filepath.Join(cfg.Directory, "domain"),
 		filepath.Join(cfg.Directory, "infrastructure"),
-	}
-
-	if cfg.Dialect != "none" {
-		dirs = append(dirs, filepath.Join(cfg.Directory, "db", "migrations"))
+		filepath.Join(cfg.Directory, "lib"),
 	}
 
 	for _, d := range dirs {
@@ -300,7 +297,7 @@ func printInitSuccess(cfg initConfig) {
 	}
 
 	fmt.Println("  go mod tidy")
-	fmt.Println("  go run ./cmd/" + cfg.BinaryName)
+	fmt.Println("  go run .")
 	fmt.Println()
 }
 

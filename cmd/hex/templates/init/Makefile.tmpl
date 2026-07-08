@@ -1,5 +1,4 @@
 BINARY := {{.BinaryName}}
-PACKAGE := ./cmd/$(BINARY)
 
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 COMMIT := $(shell git rev-parse HEAD 2>/dev/null || echo unknown)
@@ -12,7 +11,7 @@ LDFLAGS := -X {{.ModulePath}}/build.version=$(VERSION) \
 .PHONY: build test race lint fmt tidy run
 
 build:
-	go build -ldflags "$(LDFLAGS)" -o bin/$(BINARY) $(PACKAGE)
+	go build -ldflags "$(LDFLAGS)" -o bin/$(BINARY) .
 
 test:
 	go test ./...
@@ -30,4 +29,4 @@ tidy:
 	go mod tidy
 
 run:
-	go run $(PACKAGE)
+	go run .
