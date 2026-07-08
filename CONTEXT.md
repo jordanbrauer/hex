@@ -53,8 +53,16 @@ A named key-value store with TTL semantics. Backends (memory, redis, valkey, mem
 _Avoid_: Store (that's config), KV, Session (which is app-specific state).
 
 **Job** (cron):
-A named, scheduled unit of work registered with the `hex/cron` scheduler. Jobs have a cron expression and a run function; the scheduler owns tick timing and lifecycle.
+A named, scheduled unit of work registered with the `hex/cron` scheduler. Jobs have a cron expression and a run function; the scheduler owns tick timing and lifecycle. Not the same as **Job** (queue) or **Task** (pool) — all three are units of work but they differ in trigger and semantics.
 _Avoid_: Task (too generic), Cron (that's the whole scheduler subsystem).
+
+**Pool**:
+A bounded worker pool for running tasks concurrently in-process. Distinct from a **Queue** (no delivery, no persistence, in-memory only) and from **Cron** (no schedule). Backed by alitto/pond.
+_Avoid_: Pool alone can mean database connection pool; refer to those by their concrete type (`*sql.DB`).
+
+**Task** (pool):
+A function submitted to a Pool for execution. Different from a queue **Job** (no envelope, no persistence, no retry policy) and from a cron **Job** (no schedule). Runs in a pool worker goroutine.
+_Avoid_: Work, Unit.
 
 **Environment** (Lua):
 An isolated Lua VM (`*lua.LState`) that compiles and executes scripts. hex/lua provides the primitive; consumers attach whatever Go→Lua bindings they want.
