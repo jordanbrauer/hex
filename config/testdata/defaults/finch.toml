@@ -1,0 +1,6 @@
+[log]
+level = "info"
+format = "text"
+
+[code]
+workspace = "~/code"

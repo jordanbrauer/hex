@@ -1,7 +1,0 @@
-[server]
-port = 8080
-host = "localhost"
-
-[log]
-level = "info"
-format = "text"
