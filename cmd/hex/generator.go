@@ -97,6 +97,48 @@ func (g *generator) writeRaw(target string, content []byte) error {
 	return g.write(target, content)
 }
 
+// publish copies srcPath from srcFS to target verbatim. Used to
+// materialise framework-shipped config files (from a provider's
+// embedded Configs()) into the consumer's config/ dir at scaffold time.
+func (g *generator) publish(srcFS fs.FS, srcPath, target string) error {
+	data, err := fs.ReadFile(srcFS, srcPath)
+	if err != nil {
+		return fmt.Errorf("publish read %s: %w", srcPath, err)
+	}
+
+	return g.writeRaw(target, data)
+}
+
+// publishAll copies every file whose name matches suffix (e.g. ".toml")
+// from srcFS's root into targetDir. Returns the number of files copied.
+// Used for bulk publishing when a provider ships multiple assets.
+func (g *generator) publishAll(srcFS fs.FS, suffix, targetDir string) (int, error) {
+	entries, err := fs.ReadDir(srcFS, ".")
+	if err != nil {
+		return 0, fmt.Errorf("publishAll read dir: %w", err)
+	}
+
+	n := 0
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		if suffix != "" && !strings.HasSuffix(entry.Name(), suffix) {
+			continue
+		}
+
+		target := filepath.Join(targetDir, entry.Name())
+		if err := g.publish(srcFS, entry.Name(), target); err != nil {
+			return n, err
+		}
+
+		n++
+	}
+
+	return n, nil
+}
+
 // insertBeforeMarker finds marker in path's file and inserts insertion
 // on a new line before it. Idempotent: skips insertion when the exact
 // text is already present.
