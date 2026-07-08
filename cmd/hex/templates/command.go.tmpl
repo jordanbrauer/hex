@@ -1,0 +1,21 @@
+package command
+
+import (
+	"github.com/spf13/cobra"
+
+	"github.com/jordanbrauer/hex"
+)
+
+// {{.FuncName}} returns the `{{.Name}}` command.
+func {{.FuncName}}(app *hex.App) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "{{.Name}}",
+		Short: "TODO: describe {{.Name}}",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// TODO: implement.
+			return nil
+		},
+	}
+
+	return cmd
+}

@@ -1,0 +1,24 @@
+// Package {{.GroupPackage}} holds the subcommands for `{{.Group}}`.
+package {{.GroupPackage}}
+
+import (
+	"github.com/spf13/cobra"
+
+	"github.com/jordanbrauer/hex"
+)
+
+// Root returns the `{{.Group}}` command group. hex make:command --group={{.Group}}
+// inserts subcommand registrations above the `// hex:commands:{{.Group}}`
+// marker below. Do not remove the marker.
+func Root(app *hex.App) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "{{.Group}}",
+		Short: "TODO: describe {{.Group}}",
+	}
+
+	cmd.AddCommand(
+	// hex:commands:{{.Group}}
+	)
+
+	return cmd
+}
