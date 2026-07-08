@@ -45,6 +45,7 @@ hex follows the same playbook as Laravel (`artisan`), Phoenix (`mix phx.gen`), H
 | `hex/pool` | Worker pool for bounded in-process concurrency (wraps alitto/pond, ADR-0010) | ❌ not present | ❌ not present |
 | `hex/policy` | Authorisation via Casbin — model + adapter, ACL/RBAC/ABAC (ADR-0011). Adapters: memory, file; later sql | ❌ not present | ❌ not present |
 | `hex/i18n` | GNU gettext-compatible i18n via gotext + PO files (ADR-0012). Multi-locale Translator + package-level convenience | ❌ not present | ❌ not present |
+| `hex/featureflag` | Feature flags via go-feature-flag (ADR-0013). Retrievers: file, embed.FS | ❌ not present | ❌ not present |
 | **`cmd/hex`** | **Scaffolding CLI (`hex init`, `hex make:*`)** | ❌ manual setup | ❌ manual setup |
 
 ### Out of scope
@@ -1092,7 +1093,14 @@ GNU gettext-compatible i18n via gotext (ADR-0012). Multi-locale Translator with 
 **Package:** `hex/i18n`
 **Tests:** PO round-trip, plurals, msgctxt, missing translations fall back to msgid, multi-locale switching, embed.FS load.
 
-### Phase 15 — hex CLI tool (`hex init` + generators)
+### Phase 15 — Feature flags
+
+Feature-flagging via GOFF (ADR-0013). Ships file + embed.FS retrievers in v1; consumers pull other retrievers direct from GOFF and pass through Options.
+
+**Package:** `hex/featureflag`
+**Tests:** Bool/Int/String/Float64/JSON variation with default fallback, rule-based targeting, embed.FS retriever, missing flag returns default.
+
+### Phase 16 — hex CLI tool (`hex init` + generators)
 
 The scaffolding CLI itself. This is the user-facing `hex` binary that generates projects and code.
 
@@ -1112,11 +1120,11 @@ The scaffolding CLI itself. This is the user-facing `hex` binary that generates 
 
 **Tests:** Golden file tests — run each generator, compare output against checked-in snapshots. `UPDATE_SNAPSHOTS=true go test ./...` to refresh.
 
-### Phase 16 — Migrate finch-cli
+### Phase 17 — Migrate finch-cli
 
 First real consumer. Replace `app/`, `lib/ioc`, `lib/provider`, `config/repository.go`, `db/connection.go`, `log/log.go` with hex imports and the canonical project structure. This validates both the library API and the generated structure against a real, complex app.
 
-### Phase 17 — Migrate finch-bot
+### Phase 18 — Migrate finch-bot
 
 Second consumer. Replace `lib/ioc`, `lib/provider`, `lib/events`, `bot/bot.go`, `bot/bootstrap.go`, `build/*.go`, `db/connection.go` with hex imports. Validates that the same framework serves both a CLI tool and a long-running service.
 

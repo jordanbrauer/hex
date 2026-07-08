@@ -1,0 +1,46 @@
+new-checkout:
+  variations:
+    On: true
+    Off: false
+  defaultRule:
+    variation: Off
+  targeting:
+    - query: "beta eq \"true\""
+      variation: On
+
+max-retries:
+  variations:
+    Low: 3
+    High: 10
+  defaultRule:
+    variation: Low
+
+welcome-message:
+  variations:
+    Default: "Welcome!"
+    Cheerful: "Howdy, friend!"
+    Formal: "Good day."
+  defaultRule:
+    variation: Default
+  targeting:
+    - query: "region eq \"uk\""
+      variation: Formal
+    - query: "region eq \"us\""
+      variation: Cheerful
+
+request-timeout:
+  variations:
+    Fast: 1.5
+    Slow: 5.0
+  defaultRule:
+    variation: Fast
+
+api-endpoints:
+  variations:
+    Prod:
+      - "https://api.example.com"
+      - "https://api2.example.com"
+    Staging:
+      - "https://staging-api.example.com"
+  defaultRule:
+    variation: Prod
