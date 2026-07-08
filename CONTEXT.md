@@ -60,6 +60,18 @@ _Avoid_: Task (too generic), Cron (that's the whole scheduler subsystem).
 A bounded worker pool for running tasks concurrently in-process. Distinct from a **Queue** (no delivery, no persistence, in-memory only) and from **Cron** (no schedule). Backed by alitto/pond.
 _Avoid_: Pool alone can mean database connection pool; refer to those by their concrete type (`*sql.DB`).
 
+**Locale** (i18n):
+A language-scoped bundle of translations backed by one or more PO files. Loaded from disk or `fs.FS`. Different from a **Model** (policy) even though both hold configuration — a locale carries translations, a model carries authorisation DSL.
+_Avoid_: Language (means the ISO code, not the loaded bundle), Bundle.
+
+**Domain** (i18n):
+A PO file's logical grouping (e.g. `messages`, `errors`, `emails`). One Locale can hold multiple domains, addressed by name at lookup time.
+_Avoid_: Namespace (used for config), Scope.
+
+**Translator** (i18n):
+A hex-owned container that holds several **Locale**s and picks one per call based on a language code the caller supplies. Not the same as gotext's `Translator` interface (which represents a single locale) — hex/i18n's `Translator` is a multi-locale layer above it.
+_Avoid_: I18n, TranslationSet.
+
 **Model** (policy):
 A Casbin model config — the DSL file (`.conf`) that declares request/policy shape, role definitions, matchers, and effect. Models are static (loaded at startup); policies are the dynamic rules evaluated against a model.
 _Avoid_: Schema, Config (used for `hex/config`).

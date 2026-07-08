@@ -1,0 +1,21 @@
+msgid ""
+msgstr ""
+"Language: es\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "Hello, world"
+msgstr "Hola, mundo"
+
+msgid "%d apple"
+msgid_plural "%d apples"
+msgstr[0] "%d manzana"
+msgstr[1] "%d manzanas"
+
+msgctxt "menu"
+msgid "File"
+msgstr "Archivo"
+
+msgctxt "verb"
+msgid "File"
+msgstr "Archivar este informe"

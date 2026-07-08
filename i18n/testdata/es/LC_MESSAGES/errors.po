@@ -1,0 +1,11 @@
+msgid ""
+msgstr ""
+"Language: es\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "not found"
+msgstr "no encontrado"
+
+msgid "unauthorized"
+msgstr "no autorizado"
