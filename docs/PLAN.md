@@ -43,6 +43,7 @@ hex follows the same playbook as Laravel (`artisan`), Phoenix (`mix phx.gen`), H
 | `hex/lua` | Lua runtime (gopher-lua). No bindings, no plugin system (ADR-0007) | `lib/lua/*.go` | ❌ not present |
 | `hex/queue` | Generic message queue interface + Jobs layer (ADR-0009). Backends: memory, sqlite; later sqs/rabbitmq/kafka | ❌ not present | ❌ not present |
 | `hex/pool` | Worker pool for bounded in-process concurrency (wraps alitto/pond, ADR-0010) | ❌ not present | ❌ not present |
+| `hex/policy` | Authorisation via Casbin — model + adapter, ACL/RBAC/ABAC (ADR-0011). Adapters: memory, file; later sql | ❌ not present | ❌ not present |
 | **`cmd/hex`** | **Scaffolding CLI (`hex init`, `hex make:*`)** | ❌ manual setup | ❌ manual setup |
 
 ### Out of scope
@@ -1076,7 +1077,14 @@ Worker pool primitive wrapping alitto/pond. Provides bounded in-process concurre
 **Package:** `hex/pool`
 **Tests:** Submit / SubmitErr semantics, groups with context, panic recovery, StopAndWait draining, metrics accuracy.
 
-### Phase 13 — hex CLI tool (`hex init` + generators)
+### Phase 13 — Policy
+
+Authorisation wrapper around Casbin (ADR-0011). Ships memory and file adapters in v1; SQL adapter deferred to the same pattern as hex/db subpackages.
+
+**Package:** `hex/policy`
+**Tests:** RBAC + ABAC model enforcement, adapter round-trips, policy add/remove at runtime, model reload.
+
+### Phase 14 — hex CLI tool (`hex init` + generators)
 
 The scaffolding CLI itself. This is the user-facing `hex` binary that generates projects and code.
 
@@ -1096,11 +1104,11 @@ The scaffolding CLI itself. This is the user-facing `hex` binary that generates 
 
 **Tests:** Golden file tests — run each generator, compare output against checked-in snapshots. `UPDATE_SNAPSHOTS=true go test ./...` to refresh.
 
-### Phase 14 — Migrate finch-cli
+### Phase 15 — Migrate finch-cli
 
 First real consumer. Replace `app/`, `lib/ioc`, `lib/provider`, `config/repository.go`, `db/connection.go`, `log/log.go` with hex imports and the canonical project structure. This validates both the library API and the generated structure against a real, complex app.
 
-### Phase 15 — Migrate finch-bot
+### Phase 16 — Migrate finch-bot
 
 Second consumer. Replace `lib/ioc`, `lib/provider`, `lib/events`, `bot/bot.go`, `bot/bootstrap.go`, `build/*.go`, `db/connection.go` with hex imports. Validates that the same framework serves both a CLI tool and a long-running service.
 
