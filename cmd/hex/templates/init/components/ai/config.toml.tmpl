@@ -1,0 +1,14 @@
+provider = "{{.AI}}"
+{{ if eq .AI "openai" -}}
+model = "gpt-4o-mini"
+{{- else if eq .AI "anthropic" -}}
+model = "claude-3-5-sonnet-20241022"
+{{- end }}
+
+# API keys come from environment by default (OPENAI_API_KEY,
+# ANTHROPIC_API_KEY). To pin an override here (not recommended for
+# production), uncomment the matching block below.
+#
+# [{{.AI}}]
+# api_key = "sk-..."
+# base_url = ""
