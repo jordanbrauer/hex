@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/jordanbrauer/hex/container"
+	"github.com/jordanbrauer/hex/env"
 	"github.com/jordanbrauer/hex/events"
 	"github.com/jordanbrauer/hex/provider"
 )
@@ -31,9 +32,10 @@ import (
 // provider registry, and the event bus, and exposes the surface providers
 // interact with. Zero-value App is not usable; call New.
 type App struct {
-	container *container.Container
-	events    *events.Bus
-	providers *provider.Registry
+	container   *container.Container
+	events      *events.Bus
+	providers   *provider.Registry
+	environment env.Environment
 
 	mu       sync.Mutex
 	booted   bool
@@ -55,6 +57,13 @@ func WithEventBus(b *events.Bus) Option {
 	return func(a *App) { a.events = b }
 }
 
+// WithEnvironment sets the runtime environment. When unset, New
+// auto-detects via env.Detect: HEX_ENV/APP_ENV env vars, then
+// testing.Testing() -> Test, then Development.
+func WithEnvironment(e env.Environment) Option {
+	return func(a *App) { a.environment = e }
+}
+
 // New returns a fresh App with an empty container, event bus, and provider
 // registry. Options override the defaults.
 func New(opts ...Option) *App {
@@ -66,6 +75,10 @@ func New(opts ...Option) *App {
 
 	for _, opt := range opts {
 		opt(a)
+	}
+
+	if a.environment == "" {
+		a.environment = env.Detect()
 	}
 
 	return a
@@ -155,6 +168,10 @@ func (a *App) BootedAt() time.Time {
 // and Make on App itself; use Container only when you need methods the App
 // does not delegate (such as List or Count).
 func (a *App) Container() *container.Container { return a.container }
+
+// Environment returns the runtime environment. Set via
+// WithEnvironment or auto-detected by env.Detect during New.
+func (a *App) Environment() env.Environment { return a.environment }
 
 // Events returns the underlying event bus. Prefer On and Emit on App
 // itself; use Events for less common operations like EmitAsync.
