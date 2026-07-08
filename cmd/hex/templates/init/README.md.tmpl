@@ -9,12 +9,12 @@ Scaffolded by [hex](https://github.com/jordanbrauer/hex).
 ├── main.go                       # entry point
 ├── app/
 │   ├── boot.go                   # provider registration order
+│   ├── build/                    # build metadata
+│   ├── command/                  # cobra command tree (root + subcommands)
 │   └── provider/                 # service providers
-├── cli/root.go                   # cobra command tree
 ├── domain/                       # your business logic
 ├── infrastructure/               # driver adapters (SQL repos, HTTP clients)
 ├── lib/                          # local utility packages
-├── build/                        # build metadata
 ├── config/                       # embedded TOML configuration
 {{- if ne .Dialect "none" }}
 ├── database/                     # migrations.go + migrations/*.sql

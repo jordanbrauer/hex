@@ -1,5 +1,5 @@
-// Package cli holds this application's cobra command tree.
-package cli
+// Package command holds this application's cobra command tree.
+package command
 
 import (
 	"github.com/spf13/cobra"
@@ -7,7 +7,7 @@ import (
 	"github.com/jordanbrauer/hex"
 	hexcli "github.com/jordanbrauer/hex/cli"
 
-	"{{.ModulePath}}/build"
+	"{{.ModulePath}}/app/build"
 )
 
 // Root builds the top-level cobra command wired to app. hex make:command

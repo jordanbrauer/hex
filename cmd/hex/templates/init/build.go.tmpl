@@ -4,9 +4,9 @@
 //
 // Set at compile time via ldflags:
 //
-//	go build -ldflags "-X {{.ModulePath}}/build.version=v1.0.0 \
-//	                   -X {{.ModulePath}}/build.commit=$(git rev-parse HEAD) \
-//	                   -X {{.ModulePath}}/build.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+//	go build -ldflags "-X {{.ModulePath}}/app/build.version=v1.0.0 \
+//	                   -X {{.ModulePath}}/app/build.commit=$(git rev-parse HEAD) \
+//	                   -X {{.ModulePath}}/app/build.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 package build
 
 import hexbuild "github.com/jordanbrauer/hex/build"
