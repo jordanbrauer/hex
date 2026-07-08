@@ -1,0 +1,18 @@
+package provider
+
+import (
+	"github.com/jordanbrauer/hex/queue"
+	"github.com/jordanbrauer/hex/queue/memory"
+	"github.com/jordanbrauer/hex/queue/provider"
+)
+
+// Queue wires the message queue. Default backend is in-memory (fine for
+// tests and single-process apps). For sqlite/redis/sqs/etc. swap the
+// Backend function to construct the queue.Queue of your choice.
+func Queue() *provider.Provider {
+	return &provider.Provider{
+		Backend: func() queue.Queue {
+			return memory.New(memory.Options{})
+		},
+	}
+}

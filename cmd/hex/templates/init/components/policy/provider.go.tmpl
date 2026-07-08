@@ -1,0 +1,18 @@
+package provider
+
+import (
+	"github.com/jordanbrauer/hex/policy"
+	"github.com/jordanbrauer/hex/policy/provider"
+
+	apppolicy "{{.ModulePath}}/policy"
+)
+
+// Policy wires a Casbin enforcer backed by an RBAC model + CSV policy
+// file, both embedded from the app's policy/ directory.
+func Policy() *provider.Provider {
+	return &provider.Provider{
+		ModelFS:   apppolicy.Files,
+		ModelFile: "rbac_model.conf",
+		Adapter:   policy.NewFileAdapterFS(apppolicy.Files, "rbac_policy.csv"),
+	}
+}

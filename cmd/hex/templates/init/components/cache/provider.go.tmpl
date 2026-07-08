@@ -1,0 +1,17 @@
+package provider
+
+import (
+	"github.com/jordanbrauer/hex/cache/provider"
+)
+
+// Cache wires an in-memory cache. Swap to Redis/memcached by supplying
+// a Backend function that returns your chosen implementation:
+//
+//	Backend: func() cache.Cache {
+//	    return myredis.New(...)
+//	},
+func Cache() *provider.Provider {
+	return &provider.Provider{
+		Namespace: "cache",
+	}
+}

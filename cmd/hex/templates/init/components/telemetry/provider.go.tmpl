@@ -1,0 +1,13 @@
+package provider
+
+import (
+	"github.com/jordanbrauer/hex/telemetry/provider"
+)
+
+// Telemetry wires OpenTelemetry. Exporter is chosen from config
+// (telemetry.exporter: stdout | otlp | none).
+func Telemetry() *provider.Provider {
+	return &provider.Provider{
+		Namespace: "telemetry",
+	}
+}

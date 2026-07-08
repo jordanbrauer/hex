@@ -1,0 +1,9 @@
+// Package flags owns the embed.FS containing this application's GOFF
+// flag definitions. The featureflag provider consumes it via
+// flags.Files.
+package flags
+
+import "embed"
+
+//go:embed *.yaml
+var Files embed.FS

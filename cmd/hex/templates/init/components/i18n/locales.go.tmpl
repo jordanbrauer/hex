@@ -1,0 +1,8 @@
+// Package locales owns the embed.FS containing this application's
+// gettext PO files. The i18n provider consumes it via locales.Files.
+package locales
+
+import "embed"
+
+//go:embed all:*
+var Files embed.FS

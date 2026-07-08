@@ -3,8 +3,8 @@
 // this file lists them in Boot order.
 //
 // Order matters: hex/config's provider must run first so downstream
-// providers can read config.String / config.Int etc. Log follows so
-// its level is set before the rest emit anything.
+// providers can read config values. Log follows so its level is set
+// before other providers emit anything.
 package app
 
 import (
@@ -22,8 +22,32 @@ func Boot(kernel *hex.App) error {
 	return kernel.Register(
 		provider.Config(),
 		provider.Log(),
-{{- if ne .Dialect "none" }}
+{{- if .HasDatabase }}
 		provider.Database(),
+{{- end }}
+{{- if .Cache }}
+		provider.Cache(),
+{{- end }}
+{{- if .Cron }}
+		provider.Cron(),
+{{- end }}
+{{- if .Web }}
+		provider.Web(),
+{{- end }}
+{{- if .HasQueue }}
+		provider.Queue(),
+{{- end }}
+{{- if .HasTelemetry }}
+		provider.Telemetry(),
+{{- end }}
+{{- if .Policy }}
+		provider.Policy(),
+{{- end }}
+{{- if .I18n }}
+		provider.I18n(),
+{{- end }}
+{{- if .Featureflag }}
+		provider.Featureflag(),
 {{- end }}
 		// hex:providers
 	)
