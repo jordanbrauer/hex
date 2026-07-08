@@ -15,7 +15,7 @@ Scaffolded by [hex](https://github.com/jordanbrauer/hex).
 ├── domain/                       # your business logic
 ├── infrastructure/               # driver adapters (SQL repos, HTTP clients)
 ├── lib/                          # local utility packages
-├── config/                       # embedded TOML configuration
+├── config/                       # TOML configuration + schema.cue
 {{- if ne .Dialect "none" }}
 ├── database/                     # migrations.go + migrations/*.sql
 {{- end }}
@@ -29,6 +29,50 @@ go mod tidy
 go run .
 ```
 
+## Configuration
+
+Config is layered from three kinds of sources, in order:
+
+1. **Framework defaults** — each enabled hex provider ships its own TOML
+   + CUE schema (see `app/provider/config.go` for the Sources list).
+   These live inside the framework module; they're never copied into
+   your repo automatically at runtime.
+2. **Your `config/` directory** — files under `config/*.toml` override
+   framework defaults per-field. `hex init` publishes a starter copy
+   for every component you enabled, so you can inspect and edit them
+   right away.
+3. **Environment variables** — bind config keys to env vars via
+   `config/env.yaml` (not scaffolded by default). `.env` loading is
+   opt-in in `app/provider/config.go`.
+
+### Validation with CUE
+
+`config/schema.cue` is where you add validation constraints for your
+own application-specific config namespaces. Framework namespaces
+(`database`, `server`, `log`, `cache`, `telemetry`) already have
+schemas that ship inside each provider — you don't need to redeclare
+their shapes.
+
+## Publishing framework configs
+
+Every enabled hex component published its default config at
+`hex init` time. To opt into a component you didn't enable initially,
+or to refresh a copy after upgrading hex:
+
+```bash
+hex publish cache           # copy hex/cache/provider config into config/
+hex publish web             # copy hex/web/provider config into config/
+hex publish --all           # publish every framework component
+hex publish log --force     # overwrite an existing local copy
+```
+
+Available components: `cache`, `db`, `log`, `telemetry`, `web`.
+
+If you also want to *wire* a new component into `app/boot.go`, edit
+`app/provider/config.go` to add the provider's `Configs()` to the
+Sources list, then register the provider in `app/boot.go`. See
+`app/provider/log.go` for the pattern.
+
 ## Generators
 
 Add code with the `hex` CLI (from the project root):
@@ -37,6 +81,8 @@ Add code with the `hex` CLI (from the project root):
 hex make:provider payments        # app/provider/payments.go, wired into app/boot.go
 hex make:domain user              # domain/user/{user,repository,service,errors}.go
 hex make:migration create_users   # database/migrations/<ts>_create_users.{up,down}.sql
+hex make:command hello            # app/command/hello.go, wired into root cobra tree
+hex make:adapter cache/redis      # infrastructure/cache/redis/redis.go stub
 ```
 
 ## Build
