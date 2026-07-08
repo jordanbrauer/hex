@@ -60,6 +60,14 @@ _Avoid_: Task (too generic), Cron (that's the whole scheduler subsystem).
 A bounded worker pool for running tasks concurrently in-process. Distinct from a **Queue** (no delivery, no persistence, in-memory only) and from **Cron** (no schedule). Backed by alitto/pond.
 _Avoid_: Pool alone can mean database connection pool; refer to those by their concrete type (`*sql.DB`).
 
+**Tracer** (telemetry):
+An OpenTelemetry tracer that emits spans for a bounded unit of work (usually one instrumented library, package, or component). Consumers request tracers by name from the provider hex/telemetry sets up.
+_Avoid_: Trace (a trace is a tree of spans, not the emitter).
+
+**Meter** (telemetry):
+An OpenTelemetry meter that emits metrics (counters, histograms, gauges). Analogue of Tracer for metrics; consumers request meters by name.
+_Avoid_: Metric (that is the emitted value), Recorder.
+
 **Flag** (featureflag):
 A named boolean/int/string/float/JSON value evaluated against an EvaluationContext. Flag config lives in a data file (YAML/JSON/TOML) loaded by a **Retriever**. Different from a CLI flag (`--verbose`) — when both concepts appear together, disambiguate with "feature flag" and "CLI flag."
 _Avoid_: Toggle (some tools call these toggles), Switch.
