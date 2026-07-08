@@ -1,7 +1,8 @@
-// Package db owns the migrations embed.FS. The provider consumes it via
-// db.Migrations; keeping the //go:embed here lets it sit next to the SQL
-// files it references without violating the "no parent-dir embeds" rule.
-package db
+// Package database owns the migrations embed.FS. The database provider
+// consumes it via database.Migrations; keeping the //go:embed here lets
+// it sit next to the SQL files it references without violating the
+// "no parent-dir embeds" rule.
+package database
 
 import "embed"
 

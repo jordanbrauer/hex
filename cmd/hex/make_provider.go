@@ -40,7 +40,7 @@ func newMakeProviderCommand() *cobra.Command {
 				ModulePath: modulePath,
 			}
 
-			target := filepath.Join(root, "provider", snakeCase(name)+".go")
+			target := filepath.Join(root, "app", "provider", snakeCase(name)+".go")
 
 			g := newGenerator()
 			g.force = force
@@ -49,9 +49,9 @@ func newMakeProviderCommand() *cobra.Command {
 				return err
 			}
 
-			// Wire into boot.go.
-			bootFile := filepath.Join(root, "provider", "boot.go")
-			registration := fmt.Sprintf("&%s{},", data.Name)
+			// Wire into app/boot.go.
+			bootFile := filepath.Join(root, "app", "boot.go")
+			registration := fmt.Sprintf("&provider.%s{},", data.Name)
 
 			if err := insertBeforeMarker(bootFile, "// hex:providers", registration); err != nil {
 				return fmt.Errorf("wire into boot.go: %w", err)

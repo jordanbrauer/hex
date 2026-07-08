@@ -10,7 +10,6 @@ import (
 	_ "github.com/lib/pq"
 	{{- end }}
 
-	"github.com/jordanbrauer/hex"
 	"github.com/jordanbrauer/hex/container"
 	hexdb "github.com/jordanbrauer/hex/db"
 	{{ if eq .Dialect "sqlite" -}}
@@ -20,7 +19,7 @@ import (
 	{{- end }}
 	"github.com/jordanbrauer/hex/provider"
 
-	"{{.ModulePath}}/db"
+	"{{.ModulePath}}/database"
 )
 
 // Database opens the primary SQL connection and runs pending migrations.
@@ -53,11 +52,11 @@ func (p *Database) Boot(ctx context.Context, app provider.Application) error {
 	}
 
 	{{ if eq .Dialect "sqlite" -}}
-	if err := hexsqlite.Migrate(conn, db.Migrations, db.MigrationsDir); err != nil {
+	if err := hexsqlite.Migrate(conn, database.Migrations, database.MigrationsDir); err != nil {
 		return err
 	}
 	{{- else if eq .Dialect "postgres" -}}
-	if err := hexpostgres.Migrate(conn, db.Migrations, db.MigrationsDir); err != nil {
+	if err := hexpostgres.Migrate(conn, database.Migrations, database.MigrationsDir); err != nil {
 		return err
 	}
 	{{- end }}
@@ -76,9 +75,5 @@ func (p *Database) Shutdown(ctx context.Context, app provider.Application) error
 	return p.db.Close()
 }
 
-// compile-time confirmation the provider participates in shutdown.
+// Compile-time confirmation the provider participates in shutdown.
 var _ provider.Shutdowner = (*Database)(nil)
-
-// silence the unused-import warnings for the hex.App type; some future
-// generator additions will use it.
-var _ = (*hex.App)(nil)

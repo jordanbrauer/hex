@@ -46,7 +46,7 @@ func newMakeMigrationCommand() *cobra.Command {
 			}
 
 			base := fmt.Sprintf("%s_%s", data.Timestamp, data.Name)
-			dir := filepath.Join(root, "db", "migrations")
+			dir := filepath.Join(root, "database", "migrations")
 
 			files := []struct{ tpl, target string }{
 				{"templates/migration.up.sql.tmpl", filepath.Join(dir, base+".up.sql")},
