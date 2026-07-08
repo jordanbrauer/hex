@@ -2,6 +2,7 @@ package config_test
 
 import (
 	"embed"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -16,10 +17,10 @@ var testFS embed.FS
 func load(t *testing.T, cfg config.Config) *config.Store {
 	t.Helper()
 
-	if (cfg == config.Config{}) {
+	if len(cfg.Sources) == 0 {
 		cfg = config.Config{
-			Defaults:    testFS,
-			DefaultsDir: "testdata/defaults",
+			Sources:    []fs.FS{testFS},
+			SourcesDir: "testdata/defaults",
 		}
 	}
 
@@ -33,8 +34,8 @@ func load(t *testing.T, cfg config.Config) *config.Store {
 
 func TestLoad_defaults_perFileNamespace(t *testing.T) {
 	s := load(t, config.Config{
-		Defaults:    testFS,
-		DefaultsDir: "testdata/defaults",
+		Sources:    []fs.FS{testFS},
+		SourcesDir: "testdata/defaults",
 	})
 
 	if got := s.String("database.dsn"); got != "sqlite://./data.db" {
@@ -56,8 +57,8 @@ func TestLoad_defaults_perFileNamespace(t *testing.T) {
 
 func TestLoad_missingNamespace(t *testing.T) {
 	s := load(t, config.Config{
-		Defaults:    testFS,
-		DefaultsDir: "testdata/defaults",
+		Sources:    []fs.FS{testFS},
+		SourcesDir: "testdata/defaults",
 	})
 
 	if got := s.String("nope.key"); got != "" {
@@ -71,8 +72,8 @@ func TestLoad_missingNamespace(t *testing.T) {
 
 func TestLoad_pathWithoutNamespaceReturnsZero(t *testing.T) {
 	s := load(t, config.Config{
-		Defaults:    testFS,
-		DefaultsDir: "testdata/defaults",
+		Sources:    []fs.FS{testFS},
+		SourcesDir: "testdata/defaults",
 	})
 
 	if got := s.String("nokey"); got != "" {
@@ -93,9 +94,9 @@ func TestLoad_userDirOverridesDefaults(t *testing.T) {
 	}
 
 	s := load(t, config.Config{
-		Defaults:    testFS,
-		DefaultsDir: "testdata/defaults",
-		UserDir:     userDir,
+		Sources:    []fs.FS{testFS},
+		SourcesDir: "testdata/defaults",
+		UserDir:    userDir,
 	})
 
 	if got := s.Int("server.port"); got != 9090 {
@@ -115,9 +116,9 @@ func TestLoad_userDirOverridesDefaults(t *testing.T) {
 
 func TestLoad_missingUserDirNotError(t *testing.T) {
 	_, err := config.Load(config.Config{
-		Defaults:    testFS,
-		DefaultsDir: "testdata/defaults",
-		UserDir:     "/nonexistent/path",
+		Sources:    []fs.FS{testFS},
+		SourcesDir: "testdata/defaults",
+		UserDir:    "/nonexistent/path",
 	})
 
 	// Missing user dir is fine because we never read files that do not exist.
@@ -138,9 +139,9 @@ func TestLoad_malformedUserFileFails(t *testing.T) {
 	}
 
 	_, err := config.Load(config.Config{
-		Defaults:    testFS,
-		DefaultsDir: "testdata/defaults",
-		UserDir:     userDir,
+		Sources:    []fs.FS{testFS},
+		SourcesDir: "testdata/defaults",
+		UserDir:    userDir,
 	})
 	if err == nil {
 		t.Errorf("Load with malformed user file returned nil error")
@@ -152,10 +153,10 @@ func TestLoad_envOverridesDefaults(t *testing.T) {
 	t.Setenv("TEST_DATABASE_DSN", "postgres://from-env")
 
 	s := load(t, config.Config{
-		Defaults:    testFS,
-		DefaultsDir: "testdata/defaults",
-		EnvMap:      testFS,
-		EnvMapFile:  "testdata/env.yaml",
+		Sources:    []fs.FS{testFS},
+		SourcesDir: "testdata/defaults",
+		EnvMap:     testFS,
+		EnvMapFile: "testdata/env.yaml",
 	})
 
 	if got := s.Int("server.port"); got != 7777 {
@@ -181,11 +182,11 @@ func TestLoad_envOverridesUserFile(t *testing.T) {
 	t.Setenv("TEST_SERVER_PORT", "1111")
 
 	s := load(t, config.Config{
-		Defaults:    testFS,
-		DefaultsDir: "testdata/defaults",
-		UserDir:     userDir,
-		EnvMap:      testFS,
-		EnvMapFile:  "testdata/env.yaml",
+		Sources:    []fs.FS{testFS},
+		SourcesDir: "testdata/defaults",
+		UserDir:    userDir,
+		EnvMap:     testFS,
+		EnvMapFile: "testdata/env.yaml",
 	})
 
 	if got := s.Int("server.port"); got != 1111 {
@@ -198,10 +199,10 @@ func TestLoad_envMapDottedKeyBindsNestedTOML(t *testing.T) {
 	t.Setenv("TEST_LOG_LEVEL", "debug")
 
 	s := load(t, config.Config{
-		Defaults:    testFS,
-		DefaultsDir: "testdata/defaults",
-		EnvMap:      testFS,
-		EnvMapFile:  "testdata/env.yaml",
+		Sources:    []fs.FS{testFS},
+		SourcesDir: "testdata/defaults",
+		EnvMap:     testFS,
+		EnvMapFile: "testdata/env.yaml",
 	})
 
 	if got := s.String("finch.log.level"); got != "debug" {
@@ -220,11 +221,11 @@ func TestLoad_envFileLoads(t *testing.T) {
 	os.Unsetenv("TEST_LOG_LEVEL")
 
 	s := load(t, config.Config{
-		Defaults:    testFS,
-		DefaultsDir: "testdata/defaults",
-		EnvMap:      testFS,
-		EnvMapFile:  "testdata/env.yaml",
-		EnvFile:     envFile,
+		Sources:    []fs.FS{testFS},
+		SourcesDir: "testdata/defaults",
+		EnvMap:     testFS,
+		EnvMapFile: "testdata/env.yaml",
+		EnvFile:    envFile,
 	})
 
 	if got := s.String("finch.log.level"); got != "warn" {
@@ -234,9 +235,9 @@ func TestLoad_envFileLoads(t *testing.T) {
 
 func TestLoad_missingEnvFileIgnored(t *testing.T) {
 	_, err := config.Load(config.Config{
-		Defaults:    testFS,
-		DefaultsDir: "testdata/defaults",
-		EnvFile:     "/nonexistent/.env",
+		Sources:    []fs.FS{testFS},
+		SourcesDir: "testdata/defaults",
+		EnvFile:    "/nonexistent/.env",
 	})
 	if err != nil {
 		t.Errorf("Load with missing .env returned error: %v", err)
@@ -245,8 +246,8 @@ func TestLoad_missingEnvFileIgnored(t *testing.T) {
 
 func TestStore_typedAccessors(t *testing.T) {
 	s := load(t, config.Config{
-		Defaults:    testFS,
-		DefaultsDir: "testdata/defaults",
+		Sources:    []fs.FS{testFS},
+		SourcesDir: "testdata/defaults",
 	})
 
 	if got := s.Duration("database.timeout"); got != 5*time.Second {
@@ -269,8 +270,8 @@ func TestStore_unmarshalKey(t *testing.T) {
 	}
 
 	s := load(t, config.Config{
-		Defaults:    testFS,
-		DefaultsDir: "testdata/defaults",
+		Sources:    []fs.FS{testFS},
+		SourcesDir: "testdata/defaults",
 	})
 
 	var got LogCfg
@@ -290,8 +291,8 @@ func TestStore_unmarshalNamespace(t *testing.T) {
 	}
 
 	s := load(t, config.Config{
-		Defaults:    testFS,
-		DefaultsDir: "testdata/defaults",
+		Sources:    []fs.FS{testFS},
+		SourcesDir: "testdata/defaults",
 	})
 
 	var got ServerCfg
@@ -306,8 +307,8 @@ func TestStore_unmarshalNamespace(t *testing.T) {
 
 func TestStore_setRuntimeOverride(t *testing.T) {
 	s := load(t, config.Config{
-		Defaults:    testFS,
-		DefaultsDir: "testdata/defaults",
+		Sources:    []fs.FS{testFS},
+		SourcesDir: "testdata/defaults",
 	})
 
 	if err := s.Set("server.port", 5555); err != nil {
@@ -321,8 +322,8 @@ func TestStore_setRuntimeOverride(t *testing.T) {
 
 func TestStore_setUnknownNamespaceFails(t *testing.T) {
 	s := load(t, config.Config{
-		Defaults:    testFS,
-		DefaultsDir: "testdata/defaults",
+		Sources:    []fs.FS{testFS},
+		SourcesDir: "testdata/defaults",
 	})
 
 	if err := s.Set("nope.key", "x"); err == nil {
@@ -332,8 +333,8 @@ func TestStore_setUnknownNamespaceFails(t *testing.T) {
 
 func TestStore_namespaces(t *testing.T) {
 	s := load(t, config.Config{
-		Defaults:    testFS,
-		DefaultsDir: "testdata/defaults",
+		Sources:    []fs.FS{testFS},
+		SourcesDir: "testdata/defaults",
 	})
 
 	got := s.Namespaces()
@@ -363,8 +364,8 @@ func TestPriorityOrder(t *testing.T) {
 
 	// Defaults only → "info".
 	s1, _ := config.Load(config.Config{
-		Defaults:    testFS,
-		DefaultsDir: "testdata/defaults",
+		Sources:    []fs.FS{testFS},
+		SourcesDir: "testdata/defaults",
 	})
 	if got := s1.String("finch.log.level"); got != "info" {
 		t.Errorf("defaults only: finch.log.level = %q, want info", got)
@@ -372,9 +373,9 @@ func TestPriorityOrder(t *testing.T) {
 
 	// + user → "warn".
 	s2, _ := config.Load(config.Config{
-		Defaults:    testFS,
-		DefaultsDir: "testdata/defaults",
-		UserDir:     userDir,
+		Sources:    []fs.FS{testFS},
+		SourcesDir: "testdata/defaults",
+		UserDir:    userDir,
 	})
 	if got := s2.String("finch.log.level"); got != "warn" {
 		t.Errorf("with user file: finch.log.level = %q, want warn", got)
@@ -383,11 +384,11 @@ func TestPriorityOrder(t *testing.T) {
 	// + env → "error".
 	t.Setenv("TEST_LOG_LEVEL", "error")
 	s3, _ := config.Load(config.Config{
-		Defaults:    testFS,
-		DefaultsDir: "testdata/defaults",
-		UserDir:     userDir,
-		EnvMap:      testFS,
-		EnvMapFile:  "testdata/env.yaml",
+		Sources:    []fs.FS{testFS},
+		SourcesDir: "testdata/defaults",
+		UserDir:    userDir,
+		EnvMap:     testFS,
+		EnvMapFile: "testdata/env.yaml",
 	})
 	if got := s3.String("finch.log.level"); got != "error" {
 		t.Errorf("with env: finch.log.level = %q, want error", got)
