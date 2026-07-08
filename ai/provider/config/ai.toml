@@ -1,0 +1,13 @@
+# Framework defaults for hex/ai. The consumer's config/ai.toml (if
+# published or explicitly written) overrides these fields. `provider`
+# selects one of the Factory keys registered in
+# app/provider/ai.go; `model` is the LanguageModel ID passed to that
+# provider (e.g. "gpt-4o-mini", "claude-3-5-sonnet-20241022").
+
+provider = ""
+model = ""
+system_prompt = ""
+
+[settings]
+temperature = 0.7
+max_output_tokens = 4096

@@ -1,0 +1,33 @@
+package provider
+
+import (
+	aiprovider "github.com/jordanbrauer/hex/ai/provider"
+{{- if eq .AI "openai" }}
+	"github.com/jordanbrauer/hex/ai/openai"
+{{- else if eq .AI "anthropic" }}
+	"github.com/jordanbrauer/hex/ai/anthropic"
+{{- end }}
+)
+
+// AI wires the hex/ai default agent. The Factories map controls which
+// provider names are recognised by config's ai.provider key; adding
+// another hex/ai/<name> subpackage import + entry lets you switch
+// providers without touching call sites.
+//
+// Consumer additions:
+//
+//   - Tools:        set Provider.Tools with ai.NewTool[...] values
+//   - Extra options: Provider.AgentOptions for temperature, stop
+//                    conditions, etc.
+//   - Configure:    a hook that runs after the agent is built
+func AI() *aiprovider.Provider {
+	return &aiprovider.Provider{
+		Factories: map[string]aiprovider.Factory{
+{{- if eq .AI "openai" }}
+			openai.Name: openai.Factory,
+{{- else if eq .AI "anthropic" }}
+			"anthropic": anthropic.Factory,
+{{- end }}
+		},
+	}
+}

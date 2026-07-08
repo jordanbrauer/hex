@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 
+	aiprovider "github.com/jordanbrauer/hex/ai/provider"
 	cacheprovider "github.com/jordanbrauer/hex/cache/provider"
 	logprovider "github.com/jordanbrauer/hex/log/provider"
 	webprovider "github.com/jordanbrauer/hex/web/provider"
@@ -44,6 +45,7 @@ type initConfig struct {
 	Policy      bool
 	I18n        bool
 	Featureflag bool
+	AI          string // "openai" | "anthropic" | "none"
 
 	// GoVersion is the Go directive (e.g. "1.26"). Defaults to the
 	// running toolchain.
@@ -63,6 +65,9 @@ func (c initConfig) HasQueue() bool { return c.Queue != "" && c.Queue != "none" 
 // HasTelemetry reports whether the telemetry provider should be scaffolded.
 func (c initConfig) HasTelemetry() bool { return c.Telemetry != "" && c.Telemetry != "none" }
 
+// HasAI reports whether the ai provider should be scaffolded.
+func (c initConfig) HasAI() bool { return c.AI != "" && c.AI != "none" }
+
 func newInitCommand() *cobra.Command {
 	var (
 		modulePath  string
@@ -75,6 +80,7 @@ func newInitCommand() *cobra.Command {
 		policy      bool
 		i18nFlag    bool
 		featureflag bool
+		aiFlag      string
 		yes         bool
 		force       bool
 	)
@@ -99,6 +105,7 @@ func newInitCommand() *cobra.Command {
 				policy:      policy,
 				i18n:        i18nFlag,
 				featureflag: featureflag,
+				ai:          aiFlag,
 				yes:         yes,
 			})
 			if err != nil {
@@ -125,6 +132,7 @@ func newInitCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&policy, "policy", false, "scaffold a policy (Casbin) provider")
 	cmd.Flags().BoolVar(&i18nFlag, "i18n", false, "scaffold an i18n (gotext) provider")
 	cmd.Flags().BoolVar(&featureflag, "featureflag", false, "scaffold a featureflag (GOFF) provider")
+	cmd.Flags().StringVar(&aiFlag, "ai", "none", "AI provider: openai, anthropic, none")
 	cmd.Flags().BoolVar(&yes, "yes", false, "skip interactive prompts, use flag defaults")
 	cmd.Flags().BoolVar(&force, "force", false, "overwrite existing files")
 
@@ -144,6 +152,7 @@ type resolveFlags struct {
 	policy      bool
 	i18n        bool
 	featureflag bool
+	ai          string
 	yes         bool
 }
 
@@ -161,6 +170,7 @@ func resolveInitConfig(args []string, f resolveFlags) (initConfig, error) {
 		Policy:      f.policy,
 		I18n:        f.i18n,
 		Featureflag: f.featureflag,
+		AI:          f.ai,
 	}
 
 	// Resolve the target directory + project name.
@@ -242,6 +252,10 @@ func runInitPrompts(cfg *initConfig) error {
 		extras = append(extras, "featureflag")
 	}
 
+	if cfg.HasAI() {
+		extras = append(extras, "ai")
+	}
+
 	form := huh.NewForm(
 		huh.NewGroup(
 			huh.NewInput().
@@ -272,6 +286,7 @@ func runInitPrompts(cfg *initConfig) error {
 					huh.NewOption("policy     (Casbin authorization)", "policy"),
 					huh.NewOption("i18n       (gotext translations)", "i18n"),
 					huh.NewOption("featureflag (GOFF)", "featureflag"),
+					huh.NewOption("ai         (charm/fantasy LLM agent)", "ai"),
 				).
 				Value(&extras),
 		),
@@ -316,6 +331,14 @@ func applyExtras(cfg *initConfig, extras []string) {
 	} else {
 		cfg.Telemetry = "none"
 	}
+
+	if set["ai"] {
+		if cfg.AI == "" || cfg.AI == "none" {
+			cfg.AI = "openai"
+		}
+	} else {
+		cfg.AI = "none"
+	}
 }
 
 // validate rejects an initConfig with obviously bad inputs.
@@ -352,6 +375,12 @@ func (c initConfig) validate() error {
 	case "", "none", "stdout", "otlp":
 	default:
 		return fmt.Errorf("unknown --telemetry value %q (want stdout, otlp, or none)", c.Telemetry)
+	}
+
+	switch c.AI {
+	case "", "none", "openai", "anthropic":
+	default:
+		return fmt.Errorf("unknown --ai value %q (want openai, anthropic, or none)", c.AI)
 	}
 
 	return nil
@@ -408,6 +437,10 @@ func scaffold(cfg initConfig, force bool) error {
 
 	if cfg.Featureflag {
 		files = append(files, componentFiles("featureflag", cfg)...)
+	}
+
+	if cfg.HasAI() {
+		files = append(files, componentFiles("ai", cfg)...)
 	}
 
 	for _, f := range files {
@@ -495,6 +528,11 @@ func publishFrameworkConfigs(g *generator, cfg initConfig) error {
 		}
 	}
 
+	// AI: consumer's ai.toml is template-generated with per-app
+	// provider + model; framework's ai.toml stays as fallback via
+	// Sources.
+	_ = aiprovider.Configs // silence unused import when we skip publishing
+
 	// CUE schemas are NOT published — they stay in the framework
 	// module's Configs() and are read at runtime via Sources. Consumer
 	// adds their own per-namespace constraints in config/schema.cue.
@@ -541,6 +579,8 @@ func componentFiles(name string, cfg initConfig) []fileSpec {
 			fileSpec{base + "/routes.go.tmpl", filepath.Join(provDir, "routes.go")},
 			fileSpec{"templates/init/controller.go.tmpl", filepath.Join(cfg.Directory, "app", "controller", "controller.go")},
 		)
+	case "ai":
+		specs = append(specs, fileSpec{base + "/config.toml.tmpl", filepath.Join(confDir, "ai.toml")})
 	}
 
 	// Extra assets per component.

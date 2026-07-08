@@ -17,6 +17,9 @@ import (
 {{- if .Web }}
 	webprovider "github.com/jordanbrauer/hex/web/provider"
 {{- end }}
+{{- if .HasAI }}
+	aiprovider "github.com/jordanbrauer/hex/ai/provider"
+{{- end }}
 
 	"{{.ModulePath}}/config"
 )
@@ -45,6 +48,9 @@ func Config() *provider.Provider {
 {{- end }}
 {{- if .HasTelemetry }}
 			telemetryprovider.Configs(),
+{{- end }}
+{{- if .HasAI }}
+			aiprovider.Configs(),
 {{- end }}
 			config.Files,
 		},
