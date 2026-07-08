@@ -1,0 +1,13 @@
+module {{.ModulePath}}
+
+go {{.GoVersion}}
+
+require (
+	github.com/jordanbrauer/hex v0.0.0
+	github.com/spf13/cobra v1.10.2
+{{- if eq .Dialect "sqlite" }}
+	modernc.org/sqlite v1.53.0
+{{- else if eq .Dialect "postgres" }}
+	github.com/lib/pq v1.10.9
+{{- end }}
+)

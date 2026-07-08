@@ -1,0 +1,12 @@
+// Package db owns the migrations embed.FS. The provider consumes it via
+// db.Migrations; keeping the //go:embed here lets it sit next to the SQL
+// files it references without violating the "no parent-dir embeds" rule.
+package db
+
+import "embed"
+
+//go:embed migrations/*.sql
+var Migrations embed.FS
+
+// MigrationsDir is the subdirectory within Migrations that holds SQL files.
+const MigrationsDir = "migrations"

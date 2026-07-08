@@ -1,0 +1,13 @@
+package {{.Package}}
+
+import "context"
+
+// Repository is the port to persistence for {{.Name}} aggregates.
+// Infrastructure adapters (SQL, HTTP client, etc.) implement this
+// interface.
+type Repository interface {
+	Store(ctx context.Context, {{.Package}} *{{.Name}}) error
+	Get(ctx context.Context, id string) (*{{.Name}}, error)
+	List(ctx context.Context) ([]*{{.Name}}, error)
+	Delete(ctx context.Context, id string) error
+}

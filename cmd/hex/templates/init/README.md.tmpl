@@ -1,0 +1,43 @@
+# {{.Name}}
+
+Scaffolded by [hex](https://github.com/jordanbrauer/hex).
+
+## Layout
+
+```
+{{.Name}}/
+├── cmd/{{.BinaryName}}/main.go   # entry point
+├── provider/                     # service providers (boot order matters)
+├── domain/                       # your business logic
+├── infrastructure/               # driver adapters (SQL repos, HTTP clients)
+├── cli/root.go                   # cobra command tree
+├── build/                        # build metadata
+├── config/defaults/              # embedded TOML defaults
+{{- if ne .Dialect "none" }}
+├── db/migrations/                # SQL migrations (embed.FS)
+{{- end }}
+└── Makefile
+```
+
+## Running
+
+```bash
+go mod tidy
+go run ./cmd/{{.BinaryName}}
+```
+
+## Generators
+
+Add code with the `hex` CLI (from the project root):
+
+```bash
+hex make:provider payments        # provider/payments.go, wired into boot.go
+hex make:domain user              # domain/user/{user,repository,service,errors}.go
+hex make:migration create_users   # db/migrations/<ts>_create_users.{up,down}.sql
+```
+
+## Build
+
+```bash
+make build          # produces bin/{{.BinaryName}} with ldflags-populated version info
+```
