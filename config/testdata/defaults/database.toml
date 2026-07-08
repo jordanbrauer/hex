@@ -1,0 +1,4 @@
+[database]
+dsn = "sqlite://./data.db"
+max_open_conns = 10
+timeout = "5s"
