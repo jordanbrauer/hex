@@ -1,13 +1,13 @@
 package provider
 
 import (
-	logprovider "github.com/jordanbrauer/hex/log/provider"
+	"github.com/jordanbrauer/hex/log/provider"
 )
 
 // Log applies the log level (and optional caller/timestamp toggles)
 // from config to hex/log. Customise the defaults here.
-func Log() *logprovider.Provider {
-	return &logprovider.Provider{
+func Log() *provider.Provider {
+	return &provider.Provider{
 		Namespace: "log",
 	}
 }
