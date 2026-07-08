@@ -35,6 +35,12 @@ hex follows the same playbook as Laravel (`artisan`), Phoenix (`mix phx.gen`), H
 | `hex/build` | Version/commit/time via ldflags | `finch/build.go` | `build/info.go` + `build/init.go` |
 | `hex/log` | Structured logging setup | `log/log.go` (charmbracelet/log wrapper) | charmbracelet/log (direct) |
 | `hex/cli` | Cobra root command scaffolding + common flags | `cli/root.go` | `cli/root.go` |
+| `hex/cron` | Scheduled job runner | ❌ not present | `lib/cron/*.go` |
+| `hex/cache` | Multi-backend cache (memcached, redis/valkey, memory) | ❌ not present | ❌ not present |
+| `hex/disk` | Laravel-style multi-backend filesystem (`local` first; `s3`/`minio`/`gcs` as subpackages) | `util/disk/*.go` | ❌ not present |
+| `hex/tui` | Terminal renderer, markup, console, styles | `tui/{styles,markup,renderer,console,components,wizard}` | ❌ not present |
+| `hex/web` | HTTP server (echo) with standard middleware + graceful shutdown | ❌ not present | `web/*.go` + `bot/provider/web.go` |
+| `hex/lua` | Lua runtime (gopher-lua). No bindings, no plugin system (ADR-0007) | `lib/lua/*.go` | ❌ not present |
 | **`cmd/hex`** | **Scaffolding CLI (`hex init`, `hex make:*`)** | ❌ manual setup | ❌ manual setup |
 
 ### Out of scope
@@ -1012,7 +1018,49 @@ Cobra helpers for consumer apps. Depends on the app kernel and config (for `--lo
 **Packages:** `hex/cli`
 **Tests:** Root command creation, version output, flag parsing.
 
-### Phase 5 — hex CLI tool (`hex init` + generators)
+### Phase 5 — Cron
+
+A scheduler with cron expression parsing and named jobs. Provider-friendly (Start/Stop lifecycle maps to Boot/Shutdown).
+
+**Package:** `hex/cron`
+**Tests:** Job registration, cron expression parsing, tick behaviour with a virtual clock.
+
+### Phase 6 — Cache
+
+Multi-backend key-value cache. Interface + `memory` backend in v1; `redis`/`valkey`/`memcached` as opt-in subpackages under `hex/cache/*` following the `hex/db/sqlite`+`hex/db/postgres` pattern.
+
+**Package:** `hex/cache`, `hex/cache/memory`, `hex/cache/redis`
+**Tests:** Get/Set/Delete/TTL semantics, atomic increments, eviction.
+
+### Phase 7 — Disk
+
+Laravel-style multi-backend filesystem (ADR-0008). Interface + `local` backend in v1; S3/minio/GCS as opt-in subpackages once local is stable.
+
+**Package:** `hex/disk`, `hex/disk/local` (later: `hex/disk/s3`)
+**Tests:** Read/Write/Exists/Delete/List/URL against a temp dir; interface coverage against multiple backends when they exist.
+
+### Phase 8 — TUI
+
+Styles + markup + renderer + console helpers ported from finch-cli's `tui/` tree.
+
+**Package:** `hex/tui`, and subpackages as needed (`tui/markup`, `tui/renderer`, `tui/styles`).
+**Tests:** Golden-file rendering, style token resolution.
+
+### Phase 9 — Web
+
+Echo-backed HTTP server with the standard middleware stack (ADR-0006): request ID, structured logging, panic recovery, CORS, plus `/healthz` and `/readyz`. Graceful shutdown wired to `app.Shutdown` via a `Shutdowner` provider.
+
+**Package:** `hex/web`
+**Tests:** Middleware behaviour, health endpoint responses, shutdown ordering.
+
+### Phase 10 — Lua
+
+Runtime-only (ADR-0007): compile, load, execute scripts. No bindings, no plugin system.
+
+**Package:** `hex/lua`
+**Tests:** Script compilation cache, error propagation with Lua stack traces, panic isolation across scripts.
+
+### Phase 11 — hex CLI tool (`hex init` + generators)
 
 The scaffolding CLI itself. This is the user-facing `hex` binary that generates projects and code.
 
@@ -1032,11 +1080,11 @@ The scaffolding CLI itself. This is the user-facing `hex` binary that generates 
 
 **Tests:** Golden file tests — run each generator, compare output against checked-in snapshots. `UPDATE_SNAPSHOTS=true go test ./...` to refresh.
 
-### Phase 6 — Migrate finch-cli
+### Phase 12 — Migrate finch-cli
 
 First real consumer. Replace `app/`, `lib/ioc`, `lib/provider`, `config/repository.go`, `db/connection.go`, `log/log.go` with hex imports and the canonical project structure. This validates both the library API and the generated structure against a real, complex app.
 
-### Phase 7 — Migrate finch-bot
+### Phase 13 — Migrate finch-bot
 
 Second consumer. Replace `lib/ioc`, `lib/provider`, `lib/events`, `bot/bot.go`, `bot/bootstrap.go`, `build/*.go`, `db/connection.go` with hex imports. Validates that the same framework serves both a CLI tool and a long-running service.
 

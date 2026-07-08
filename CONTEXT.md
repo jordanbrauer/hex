@@ -43,3 +43,27 @@ _Avoid_: Skeleton, boilerplate, starter
 **Env Map**:
 A YAML file (`config/env.yaml`) that declaratively maps config keys to environment variable names. Not app config — it's a binding declaration that tells Viper which env vars override which config keys.
 _Avoid_: Env config, environment file (that's `.env`)
+
+**Disk**:
+A named backend for reading and writing files (local filesystem, S3, MinIO, GCS). A hex app can have several disks configured concurrently and address each by name (`disk.Get("uploads")`). Interface lives in `hex/disk`; concrete backends live in subpackages.
+_Avoid_: Storage, Bucket, Filesystem (the last is what the local backend wraps, not the abstraction).
+
+**Cache**:
+A named key-value store with TTL semantics. Backends (memory, redis, valkey, memcached) implement the same `Cache` interface. Consumers resolve caches by name from the container.
+_Avoid_: Store (that's config), KV, Session (which is app-specific state).
+
+**Job** (cron):
+A named, scheduled unit of work registered with the `hex/cron` scheduler. Jobs have a cron expression and a run function; the scheduler owns tick timing and lifecycle.
+_Avoid_: Task (too generic), Cron (that's the whole scheduler subsystem).
+
+**Environment** (Lua):
+An isolated Lua VM (`*lua.LState`) that compiles and executes scripts. hex/lua provides the primitive; consumers attach whatever Go→Lua bindings they want.
+_Avoid_: VM (implementation detail), Sandbox (implies stronger isolation guarantees than we make).
+
+**Renderer** (TUI):
+A component that converts hex markup into a target output format (ANSI terminal, plain text, Slack blocks, HTML). Different consumers pick different renderers; the markup is the shared IR.
+_Avoid_: Formatter, Printer (both used elsewhere for different concepts).
+
+**Route** (web):
+An HTTP endpoint registered with the echo server. hex/web owns the server, middleware stack, and lifecycle; consumers own the routes.
+_Avoid_: Endpoint (used for connection targets), Handler (that's the func under the route).
