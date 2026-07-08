@@ -178,8 +178,10 @@ func TestWithPreRun_runsAfterHexes(t *testing.T) {
 		t.Fatalf("Execute error = %v", err)
 	}
 
-	if saw != "error" {
-		t.Errorf("consumer PreRun saw level %q; want error (proves hex's ran first)", saw)
+	// hexlog.Level is aliased to slog.Level whose String() renders
+	// upper-case ("ERROR"). The consumer prerun sees whatever hex set.
+	if saw != "ERROR" {
+		t.Errorf("consumer PreRun saw level %q; want ERROR (proves hex's ran first)", saw)
 	}
 }
 
