@@ -60,6 +60,14 @@ _Avoid_: Task (too generic), Cron (that's the whole scheduler subsystem).
 A bounded worker pool for running tasks concurrently in-process. Distinct from a **Queue** (no delivery, no persistence, in-memory only) and from **Cron** (no schedule). Backed by alitto/pond.
 _Avoid_: Pool alone can mean database connection pool; refer to those by their concrete type (`*sql.DB`).
 
+**Flag** (featureflag):
+A named boolean/int/string/float/JSON value evaluated against an EvaluationContext. Flag config lives in a data file (YAML/JSON/TOML) loaded by a **Retriever**. Different from a CLI flag (`--verbose`) — when both concepts appear together, disambiguate with "feature flag" and "CLI flag."
+_Avoid_: Toggle (some tools call these toggles), Switch.
+
+**Retriever** (featureflag):
+The source of flag definitions — file, embed.FS, HTTP, S3, K8s ConfigMap, etc. Different from **Adapter** (policy) even though both are pluggable storage: retrievers are read-only and polling-based, adapters are read/write and event-driven.
+_Avoid_: Loader, Source.
+
 **Locale** (i18n):
 A language-scoped bundle of translations backed by one or more PO files. Loaded from disk or `fs.FS`. Different from a **Model** (policy) even though both hold configuration — a locale carries translations, a model carries authorisation DSL.
 _Avoid_: Language (means the ISO code, not the loaded bundle), Bundle.
