@@ -20,6 +20,15 @@ Write your business logic. Let hex handle the rest.
 
 ## Install
 
+**Homebrew (macOS + Linux, recommended):**
+
+```sh
+brew tap jordanbrauer/hex https://github.com/jordanbrauer/hex
+brew install jordanbrauer/hex/hex
+```
+
+**Go toolchain:**
+
 ```sh
 go install github.com/jordanbrauer/hex/cmd/hex@latest
 ```

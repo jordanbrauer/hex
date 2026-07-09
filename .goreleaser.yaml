@@ -1,0 +1,116 @@
+# GoReleaser config for the hex CLI scaffolder.
+#
+# Two things happen on `goreleaser release`:
+#
+#   1. Build the `hex` binary for darwin + linux, arm64 + amd64, and
+#      package each as a .tar.gz archive uploaded to the GitHub Release.
+#
+#   2. Regenerate Formula/hex.rb pointing at the new release's tarballs
+#      and commit it back to this repository. The formula lives in-tree
+#      rather than in a dedicated homebrew-tap repo — users install via
+#      `brew tap jordanbrauer/hex https://github.com/jordanbrauer/hex`
+#      then `brew install jordanbrauer/hex/hex`.
+#
+# macOS Gatekeeper note: hex ships unsigned. We package as .tar.gz and
+# use `brews:` (Formula) rather than `homebrew_casks:` (Cask) because
+# Homebrew's formula install extracts the tarball via `tar`, which
+# strips the com.apple.quarantine extended attribute the browser adds
+# to downloads. Users install the CLI without any Gatekeeper prompts,
+# no self-signing, no notarization, no re-quarantine dance.
+
+version: 2
+project_name: hex
+dist: ./dist
+
+builds:
+  - id: hex
+    main: ./cmd/hex
+    binary: hex
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    flags:
+      - -trimpath
+    ldflags:
+      - >-
+        -s -w
+        -X github.com/jordanbrauer/hex/build.branch={{.Branch}}
+        -X github.com/jordanbrauer/hex/build.commit={{.Commit}}
+        -X github.com/jordanbrauer/hex/build.date={{.Date}}
+        -X github.com/jordanbrauer/hex/build.version={{.Version}}
+    env:
+      - CGO_ENABLED=0
+    hooks:
+      pre: go mod tidy
+
+archives:
+  - id: hex
+    formats:
+      - tar.gz
+    # The macOS Gatekeeper workaround only works because the archive
+    # extraction strips quarantine. Do not switch to zip on darwin.
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else }}{{ .Arch }}{{ end }}
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  use: github
+  sort: asc
+  groups:
+    - title: Features
+      regexp: '^.*?(feat|feature)[(\\w)]*:?\\s+.*$'
+      order: 0
+    - title: Bug fixes
+      regexp: '^.*?(fix|bug)[(\\w)]*:?\\s+.*$'
+      order: 1
+    - title: Other
+      order: 999
+
+release:
+  github:
+    owner: jordanbrauer
+    name: hex
+  # Draft the release so we can review the notes + assets before
+  # publishing. Set to false once the pipeline is proven.
+  draft: false
+  prerelease: auto
+
+# `brews` is deprecated in GoReleaser v2 in favour of
+# `homebrew_casks`. We use `brews` (Formula) intentionally: the formula
+# install strips com.apple.quarantine, whereas casks retain it.
+# Migrate to `homebrew_casks` if/when hex CLI ships codesigned +
+# notarised binaries.
+brews:
+  - name: hex
+    description: "An opinionated Go application framework."
+    homepage: "https://github.com/jordanbrauer/hex"
+    license: "MIT"
+    commit_author:
+      name: "goreleaser-bot"
+      email: "goreleaser@carlosbecker.com"
+    commit_msg_template: "brew: update hex to {{ .Tag }}"
+    repository:
+      owner: jordanbrauer
+      name: hex
+      branch: main
+      # Uses the workflow's built-in GITHUB_TOKEN (has contents: write
+      # on this repo). No separate tap token needed since the formula
+      # lives in the source repo itself.
+      token: "{{ .Env.GITHUB_TOKEN }}"
+      pull_request:
+        enabled: false
+    directory: Formula
+    install: |
+      bin.install "hex"
+    test: |
+      system bin/"hex", "--help"
