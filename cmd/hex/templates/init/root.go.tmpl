@@ -31,6 +31,7 @@ func Root(app *hex.App) *cobra.Command {
 	// Framework-provided commands. Each framework provider that
 	// exposes a subcommand does so through its provider package.
 	root.AddCommand(luaprovider.ReplCommand(app))
+	root.AddCommand(luaprovider.RunCommand(app))
 {{- if .Web }}
 	root.AddCommand(webprovider.ServeCommand(app))
 {{- end }}
