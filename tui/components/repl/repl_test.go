@@ -316,6 +316,141 @@ func TestModes_backspaceMidInputDoesNotSwitchMode(t *testing.T) {
 	}
 }
 
+func TestContinuation_incompleteBuffersAndSwitchesPrompt(t *testing.T) {
+	var seen []string
+
+	m := New(Options{
+		Prompt:             "> ",
+		ContinuationPrompt: ". ",
+		Evaluator: func(_, line string) Result {
+			seen = append(seen, line)
+
+			if !strings.Contains(line, "end") {
+				return Result{Incomplete: true}
+			}
+
+			return Result{Output: "done"}
+		},
+	})
+
+	// First line: incomplete
+	m = typeString(t, m, "function foo()")
+	m = press(t, m, tea.KeyEnter)
+
+	if !m.InContinuation() {
+		t.Fatalf("expected InContinuation after incomplete submit")
+	}
+
+	if view := m.View(); !strings.Contains(view, ". ") {
+		t.Errorf("prompt should be continuation '. ', view: %q", view)
+	}
+
+	// Second line: still incomplete
+	m = typeString(t, m, "  print(1)")
+	m = press(t, m, tea.KeyEnter)
+
+	if !m.InContinuation() {
+		t.Fatalf("still expected InContinuation after second incomplete line")
+	}
+
+	// Third line: complete
+	m = typeString(t, m, "end")
+	m = press(t, m, tea.KeyEnter)
+
+	if m.InContinuation() {
+		t.Errorf("should have exited continuation after 'end'")
+	}
+
+	// Evaluator saw 3 calls with progressively longer joined buffers.
+	if len(seen) != 3 {
+		t.Fatalf("evaluator calls = %d, want 3: %v", len(seen), seen)
+	}
+
+	if want := "function foo()"; seen[0] != want {
+		t.Errorf("seen[0] = %q, want %q", seen[0], want)
+	}
+
+	if want := "function foo()\n  print(1)\nend"; seen[2] != want {
+		t.Errorf("seen[2] = %q, want %q", seen[2], want)
+	}
+
+	// Submissions and history record the full multi-line entry as
+	// one item.
+	if got := m.Submissions(); len(got) != 1 || got[0] != seen[2] {
+		t.Errorf("submissions = %v, want [%q]", got, seen[2])
+	}
+}
+
+func TestContinuation_ctrlCAborts(t *testing.T) {
+	m := New(Options{
+		Prompt: "> ",
+		Evaluator: func(_, _ string) Result {
+			return Result{Incomplete: true}
+		},
+	})
+
+	m = typeString(t, m, "function foo()")
+	m = press(t, m, tea.KeyEnter)
+
+	if !m.InContinuation() {
+		t.Fatalf("expected continuation state")
+	}
+
+	// Ctrl+C aborts the continuation without quitting.
+	newModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
+	m = newModel.(Model)
+
+	if m.quit {
+		t.Errorf("Ctrl+C in continuation should NOT quit")
+	}
+
+	if m.InContinuation() {
+		t.Errorf("Ctrl+C in continuation should reset")
+	}
+
+	// The returned cmd may be a batch/sequence but must not be tea.Quit.
+	_ = cmd
+}
+
+func TestContinuation_ctrlCOutsideContinuationStillQuits(t *testing.T) {
+	m := New(Options{
+		Prompt:    "> ",
+		Evaluator: func(_, _ string) Result { return Result{} },
+	})
+
+	newModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
+	m = newModel.(Model)
+
+	if !m.quit {
+		t.Errorf("Ctrl+C outside continuation should quit")
+	}
+
+	if cmd == nil {
+		t.Errorf("expected tea.Quit cmd")
+	}
+}
+
+func TestContinuation_modePromptUsedInMultiModeSetup(t *testing.T) {
+	m := New(Options{
+		Modes: []Mode{
+			{
+				Name:               "teal",
+				Activator:          't',
+				Prompt:             "teal> ",
+				ContinuationPrompt: "teal. ",
+			},
+		},
+		Evaluator: func(_, _ string) Result { return Result{Incomplete: true} },
+	})
+
+	m = typeString(t, m, "function foo()")
+	m = press(t, m, tea.KeyEnter)
+
+	if view := m.View(); !strings.Contains(view, "teal. ") {
+		t.Errorf("expected mode's ContinuationPrompt in view, got %q", view)
+	}
+}
+
 func TestViewIsOnlyPromptLine(t *testing.T) {
 	m := New(Options{
 		Prompt:    "> ",

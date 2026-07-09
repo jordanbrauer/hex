@@ -84,6 +84,51 @@ func TestSaveHistory_emptyAppNameErrors(t *testing.T) {
 	}
 }
 
+func TestIsIncompleteError_gopherLua(t *testing.T) {
+	env := hexlua.New()
+	t.Cleanup(func() { _ = env.Close() })
+
+	cases := []struct {
+		name       string
+		src        string
+		incomplete bool
+	}{
+		{"unclosed function", "function foo()", true},
+		{"unclosed table", "local x = {1,", true},
+		{"unclosed if", "if true then", true},
+		{"unclosed call", "foo(", true},
+		{"complete function", "function foo() end", false},
+		{"real syntax error", "function foo() end end", false},
+		{"nil is not incomplete", "", false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.src == "" {
+				if isIncompleteError(nil, false) {
+					t.Errorf("nil err reported incomplete")
+				}
+
+				return
+			}
+
+			_, err := env.L.LoadString(tc.src)
+			if err == nil {
+				if tc.incomplete {
+					t.Fatalf("expected parse to fail for %q", tc.src)
+				}
+
+				return
+			}
+
+			got := isIncompleteError(err, false)
+			if got != tc.incomplete {
+				t.Errorf("isIncompleteError(%q) = %v, want %v; err=%q", tc.src, got, tc.incomplete, err.Error())
+			}
+		})
+	}
+}
+
 // run is a tiny helper that wires stdin/stdout/stderr buffers and
 // runs the REPL in the requested mode against a bare environment.
 func run(t *testing.T, in string, mode Mode) (out, errOut string) {

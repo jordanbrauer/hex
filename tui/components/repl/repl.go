@@ -44,6 +44,13 @@ type Result struct {
 
 	// Exit requests the REPL loop to terminate cleanly.
 	Exit bool
+
+	// Incomplete signals that the submitted input is syntactically
+	// incomplete — e.g. an unclosed function block or table literal.
+	// The REPL switches to a continuation prompt and buffers the
+	// user's next line onto the current one instead of evaluating.
+	// Output and Err are ignored when Incomplete is true.
+	Incomplete bool
 }
 
 // Evaluator is the callback invoked for every submitted line. Mode
@@ -72,6 +79,13 @@ type Mode struct {
 	// this mode is active, e.g. "myapp(teal)> ".
 	Prompt string
 
+	// ContinuationPrompt is rendered when the previous submission
+	// returned Result.Incomplete, so the user sees that their input
+	// is being buffered. When empty, defaults to Prompt — typically
+	// callers pass a same-width variant that swaps "> " for ". "
+	// or "... " so column alignment is preserved.
+	ContinuationPrompt string
+
 	// PromptColor, when non-nil, overrides the base Styles.Prompt's
 	// foreground for this mode. Any nil defers to the base style.
 	PromptColor lipgloss.TerminalColor
@@ -83,6 +97,12 @@ type Options struct {
 	// is empty (single-mode REPL). Defaults to "> ". Ignored when
 	// Modes is set — each mode carries its own prompt.
 	Prompt string
+
+	// ContinuationPrompt is used in single-mode configurations when
+	// the previous submission returned Result.Incomplete. Defaults
+	// to Prompt (so continuation is visually indistinguishable
+	// unless the caller sets this to something like "... ").
+	ContinuationPrompt string
 
 	// Banner is optional multi-line text printed above the first
 	// prompt. Newlines are respected.
@@ -123,6 +143,15 @@ type Model struct {
 	activators  map[rune]int // rune → mode index for quick lookup
 	singleMode  bool         // true when Options.Modes was empty (legacy single-mode REPL)
 	fixedPrompt string       // used when singleMode
+
+	// Continuation state — buffer of previously-submitted lines
+	// whose join was not yet syntactically complete. Populated when
+	// the evaluator returns Incomplete; drained (with the newest
+	// line appended) on the next Enter and passed to the evaluator
+	// as a single joined string.
+	inContinuation     bool
+	continuationBuffer []string
+	fixedContinuation  string // used when singleMode
 
 	// submissions records every line submitted to the evaluator
 	// (empty lines and exit directives excluded). Used by tests to
@@ -191,6 +220,11 @@ func New(opts Options) Model {
 		if m.fixedPrompt == "" {
 			m.fixedPrompt = "> "
 		}
+
+		m.fixedContinuation = opts.ContinuationPrompt
+		if m.fixedContinuation == "" {
+			m.fixedContinuation = m.fixedPrompt
+		}
 	} else {
 		for i, mode := range opts.Modes {
 			if mode.Activator != 0 {
@@ -232,7 +266,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.Type {
-		case tea.KeyCtrlC, tea.KeyCtrlD:
+		case tea.KeyCtrlC:
+			// Ctrl+C in continuation mode aborts the pending buffer
+			// (Python REPL convention). Outside continuation it
+			// quits, matching the previous behaviour.
+			if m.inContinuation {
+				m.inContinuation = false
+				m.continuationBuffer = nil
+				m.input.SetValue("")
+
+				return m, tea.Sequence(initCmds...)
+			}
+
+			m.quit = true
+
+			return m, tea.Quit
+
+		case tea.KeyCtrlD:
 			m.quit = true
 
 			return m, tea.Quit
@@ -248,14 +298,30 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			cmds := append(initCmds, tea.Println(echo))
 
-			if strings.TrimSpace(line) == "" {
+			// Empty submits: in continuation mode, treat as "finish
+			// input as-is" (evaluate whatever's buffered). Outside
+			// continuation, an empty line is just a reprompt.
+			if strings.TrimSpace(line) == "" && !m.inContinuation {
 				return m, tea.Sequence(cmds...)
 			}
 
-			m.pushHistory(line)
-			m.submissions = append(m.submissions, line)
+			m.continuationBuffer = append(m.continuationBuffer, line)
+			full := strings.Join(m.continuationBuffer, "\n")
 
-			result := m.evaluate(m.currentModeName(), line)
+			result := m.evaluate(m.currentModeName(), full)
+
+			if result.Incomplete {
+				m.inContinuation = true
+
+				return m, tea.Sequence(cmds...)
+			}
+
+			// Complete: commit the input to history as a single
+			// (possibly multi-line) entry and clear the buffer.
+			m.pushHistory(full)
+			m.submissions = append(m.submissions, full)
+			m.continuationBuffer = nil
+			m.inContinuation = false
 
 			if result.Output != "" {
 				out := m.styles.Output.Render(result.Output)
@@ -329,12 +395,17 @@ func (m Model) View() string {
 	return m.renderPrompt() + m.input.View()
 }
 
-// renderPrompt returns the styled prompt for the current mode.
-// Handles both single-mode (Options.Prompt) and multi-mode
-// (Options.Modes[modeIdx]) configurations.
+// renderPrompt returns the styled prompt for the current mode /
+// continuation state. Handles both single-mode (Options.Prompt) and
+// multi-mode (Options.Modes[modeIdx]) configurations.
 func (m Model) renderPrompt() string {
 	if m.singleMode {
-		return m.styles.Prompt.Render(m.fixedPrompt)
+		text := m.fixedPrompt
+		if m.inContinuation {
+			text = m.fixedContinuation
+		}
+
+		return m.styles.Prompt.Render(text)
 	}
 
 	mode := m.modes[m.modeIdx]
@@ -344,7 +415,12 @@ func (m Model) renderPrompt() string {
 		style = style.Foreground(mode.PromptColor)
 	}
 
-	return style.Render(mode.Prompt)
+	text := mode.Prompt
+	if m.inContinuation && mode.ContinuationPrompt != "" {
+		text = mode.ContinuationPrompt
+	}
+
+	return style.Render(text)
 }
 
 // currentModeName returns the active mode's Name, or "" for a
@@ -360,6 +436,10 @@ func (m Model) currentModeName() string {
 // CurrentMode returns the active mode's Name. Useful for tests and
 // callers that want to observe or persist the mode across sessions.
 func (m Model) CurrentMode() string { return m.currentModeName() }
+
+// InContinuation reports whether the REPL is currently waiting for
+// the user to finish a multi-line input.
+func (m Model) InContinuation() bool { return m.inContinuation }
 
 // pushHistory records line in the ring buffer, trimming the oldest
 // entry when HistoryLimit is exceeded.
