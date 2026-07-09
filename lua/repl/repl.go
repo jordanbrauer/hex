@@ -28,6 +28,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	lua "github.com/yuin/gopher-lua"
 
+	hexlog "github.com/jordanbrauer/hex/log"
 	hexlua "github.com/jordanbrauer/hex/lua"
 	"github.com/jordanbrauer/hex/lua/teal"
 	tuirepl "github.com/jordanbrauer/hex/tui/components/repl"
@@ -276,9 +277,17 @@ func runInteractive(env *hexlua.Environment, session *teal.Session, isTeal bool,
 
 		var outBuf strings.Builder
 
+		// Redirect Lua's print AND hex/log's charm handler into the
+		// same buffer so both flow through Result.Output into
+		// scrollback via tea.Println. Otherwise print() writes to
+		// os.Stdout and log.info() writes to os.Stderr, both of
+		// which collide with Bubble Tea's active render.
 		origStdout := env.Stdout()
 		env.SetStdout(&outBuf)
 		defer env.SetStdout(origStdout)
+
+		hexlog.SetOutput(&outBuf)
+		defer hexlog.SetOutput(os.Stderr)
 
 		modeIsTeal := mode == "teal"
 
