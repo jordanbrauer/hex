@@ -5,6 +5,9 @@ coverage.out
 coverage.html
 /hex
 /dist/
+# Compiled example binaries (produced by `go build` inside each example)
+examples/ai-lua/ai-lua
+examples/swapi/swapi
 
 # Environment
 .env
