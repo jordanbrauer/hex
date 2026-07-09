@@ -6,6 +6,7 @@ import (
 
 	"github.com/jordanbrauer/hex"
 	hexcli "github.com/jordanbrauer/hex/cli"
+	luaprovider "github.com/jordanbrauer/hex/lua/provider"
 {{- if .Web }}
 	webprovider "github.com/jordanbrauer/hex/web/provider"
 {{- end }}
@@ -27,9 +28,10 @@ func Root(app *hex.App) *cobra.Command {
 		App: build.Info().Name,
 	}))
 
+	// Framework-provided commands. Each framework provider that
+	// exposes a subcommand does so through its provider package.
+	root.AddCommand(luaprovider.ReplCommand(app))
 {{- if .Web }}
-	// Framework-provided commands. Each enabled framework provider
-	// contributes a *cobra.Command from its provider package.
 	root.AddCommand(webprovider.ServeCommand(app))
 {{- end }}
 

@@ -22,6 +22,7 @@ func Boot(kernel *hex.App) error {
 	return kernel.Register(
 		provider.Config(),
 		provider.Log(),
+		provider.Lua(),
 {{- if .HasDatabase }}
 		provider.Database(),
 {{- end }}

@@ -11,6 +11,7 @@ import (
 	dbprovider "github.com/jordanbrauer/hex/db/provider"
 {{- end }}
 	logprovider "github.com/jordanbrauer/hex/log/provider"
+	luaprovider "github.com/jordanbrauer/hex/lua/provider"
 {{- if .HasTelemetry }}
 	telemetryprovider "github.com/jordanbrauer/hex/telemetry/provider"
 {{- end }}
@@ -37,6 +38,7 @@ func Config() *provider.Provider {
 	return &provider.Provider{
 		Sources: []fs.FS{
 			logprovider.Configs(),
+			luaprovider.Configs(),
 {{- if .HasDatabase }}
 			dbprovider.Configs(),
 {{- end }}

@@ -169,13 +169,29 @@ func Run(opts Options) error {
 			msg := trimTraceback(err.Error())
 			fmt.Fprintln(opts.ErrOut, "error:", msg)
 
-			// Teal-specific hint for the most common REPL confusion:
-			// `foo = 12` in Teal errors as "unknown variable: foo".
-			// Point the user at the fix.
-			if isTeal && strings.Contains(msg, "unknown variable") {
-				fmt.Fprintln(opts.ErrOut, "hint: prefix with `global` to declare, e.g. `global foo: number = 12`")
+			// Teal-specific hints for common confusions.
+			if isTeal {
+				hint := tealErrorHint(msg)
+				if hint != "" {
+					fmt.Fprintln(opts.ErrOut, hint)
+				}
 			}
 		}
+	}
+}
+
+// tealErrorHint maps a Teal error message to a friendly one-line hint,
+// or the empty string when nothing useful applies. Keeps the REPL's
+// error output focused: one hint at most, targeted at the specific
+// stumble.
+func tealErrorHint(msg string) string {
+	switch {
+	case strings.Contains(msg, "unknown variable"):
+		return "hint: prefix with `global` to declare, e.g. `global foo: number = 12`"
+	case strings.Contains(msg, "no type information for required module"):
+		return "hint: Go-registered modules need a .d.tl type stub for Teal typechecking. Pass `--mode lua` to use them now."
+	default:
+		return ""
 	}
 }
 

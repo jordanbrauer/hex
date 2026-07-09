@@ -14,6 +14,7 @@ import (
 	aiprovider "github.com/jordanbrauer/hex/ai/provider"
 	cacheprovider "github.com/jordanbrauer/hex/cache/provider"
 	logprovider "github.com/jordanbrauer/hex/log/provider"
+	luaprovider "github.com/jordanbrauer/hex/lua/provider"
 	webprovider "github.com/jordanbrauer/hex/web/provider"
 )
 
@@ -547,6 +548,7 @@ func coreFiles(cfg initConfig) []fileSpec {
 		{"templates/init/config_embed.go.tmpl", filepath.Join(cfg.Directory, "config", "config.go")},
 		{"templates/init/provider_config.go.tmpl", filepath.Join(cfg.Directory, "app", "provider", "config.go")},
 		{"templates/init/provider_log.go.tmpl", filepath.Join(cfg.Directory, "app", "provider", "log.go")},
+		{"templates/init/provider_lua.go.tmpl", filepath.Join(cfg.Directory, "app", "provider", "lua.go")},
 		{"templates/init/justfile.tmpl", filepath.Join(cfg.Directory, "justfile")},
 		{"templates/init/gitignore.tmpl", filepath.Join(cfg.Directory, ".gitignore")},
 		{"templates/init/env.dist.tmpl", filepath.Join(cfg.Directory, ".env.dist")},
@@ -567,6 +569,12 @@ func publishFrameworkConfigs(g *generator, cfg initConfig) error {
 
 	// Log always publishes (log provider is always registered).
 	if _, err := g.publishAll(logprovider.Configs(), ".toml", confDir); err != nil {
+		return err
+	}
+
+	// Lua always publishes (Lua provider is always registered so
+	// `<app> repl` works out of the box).
+	if _, err := g.publishAll(luaprovider.Configs(), ".toml", confDir); err != nil {
 		return err
 	}
 
