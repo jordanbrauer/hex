@@ -46,13 +46,42 @@ type Result struct {
 	Exit bool
 }
 
-// Evaluator is the callback invoked for every submitted line.
-type Evaluator func(line string) Result
+// Evaluator is the callback invoked for every submitted line. Mode
+// carries the name of the active Mode at submission time, letting
+// callers dispatch to different runtimes (e.g. Teal vs Lua) without
+// juggling closures per mode.
+type Evaluator func(mode, line string) Result
+
+// Mode describes a REPL mode — a language or command surface the
+// user can switch to. Julia's REPL popularised this pattern with
+// `?` (help), `;` (shell), `]` (pkg); we generalise it: any rune
+// pressed at an empty prompt swaps modes, and backspace at an
+// empty prompt in a non-default mode reverts to the default.
+type Mode struct {
+	// Name is what gets passed to the Evaluator. Required and
+	// unique within Options.Modes.
+	Name string
+
+	// Activator is the rune that switches TO this mode when typed
+	// on an empty prompt. Zero means the mode is not
+	// user-selectable (e.g. a default that only reachable via
+	// backspace).
+	Activator rune
+
+	// Prompt is the string rendered before the input line while
+	// this mode is active, e.g. "myapp(teal)> ".
+	Prompt string
+
+	// PromptColor, when non-nil, overrides the base Styles.Prompt's
+	// foreground for this mode. Any nil defers to the base style.
+	PromptColor lipgloss.TerminalColor
+}
 
 // Options configures a new Model.
 type Options struct {
-	// Prompt is the string shown before the input on each line.
-	// Defaults to "> ".
+	// Prompt is the string shown before the input line when Modes
+	// is empty (single-mode REPL). Defaults to "> ". Ignored when
+	// Modes is set — each mode carries its own prompt.
 	Prompt string
 
 	// Banner is optional multi-line text printed above the first
@@ -61,6 +90,15 @@ type Options struct {
 
 	// Evaluator is called for each submitted line. Required.
 	Evaluator Evaluator
+
+	// Modes are the switchable modes. The first mode is the
+	// default; users switch to another mode by typing its
+	// Activator rune on an empty prompt, and return to the default
+	// by pressing Backspace on an empty prompt.
+	//
+	// Empty means single-mode: the evaluator sees mode="" and
+	// Prompt/Banner behave as before.
+	Modes []Mode
 
 	// HistoryLimit caps the in-memory command history. 0 or
 	// negative means unlimited.
@@ -73,12 +111,19 @@ type Model struct {
 	history     []string
 	historyIdx  int // -1 = editing a fresh line; else index into history
 	liveInput   string
-	prompt      string
 	banner      string
 	bannerShown bool
 	evaluate    Evaluator
 	limit       int
 	quit        bool
+
+	// Mode state
+	modes       []Mode
+	modeIdx     int          // index into modes; 0 is default
+	activators  map[rune]int // rune → mode index for quick lookup
+	singleMode  bool         // true when Options.Modes was empty (legacy single-mode REPL)
+	fixedPrompt string       // used when singleMode
+
 	// submissions records every line submitted to the evaluator
 	// (empty lines and exit directives excluded). Used by tests to
 	// assert what the user typed without inspecting tea.Cmds.
@@ -122,26 +167,39 @@ func DefaultStyles() Styles {
 
 // New builds a Model.
 func New(opts Options) Model {
-	prompt := opts.Prompt
-	if prompt == "" {
-		prompt = "> "
-	}
-
 	ti := textinput.New()
 	ti.Prompt = "" // we render the prompt in View for consistent styling
 	ti.Focus()
 	ti.CharLimit = 0
 
-	return Model{
+	m := Model{
 		input:      ti,
 		history:    nil,
 		historyIdx: -1,
-		prompt:     prompt,
 		banner:     opts.Banner,
 		evaluate:   opts.Evaluator,
 		limit:      opts.HistoryLimit,
 		styles:     DefaultStyles(),
+		modes:      opts.Modes,
+		modeIdx:    0,
+		activators: map[rune]int{},
+		singleMode: len(opts.Modes) == 0,
 	}
+
+	if m.singleMode {
+		m.fixedPrompt = opts.Prompt
+		if m.fixedPrompt == "" {
+			m.fixedPrompt = "> "
+		}
+	} else {
+		for i, mode := range opts.Modes {
+			if mode.Activator != 0 {
+				m.activators[mode.Activator] = i
+			}
+		}
+	}
+
+	return m
 }
 
 // Init satisfies tea.Model. Emits the banner (if any) into scrollback
@@ -185,7 +243,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.historyIdx = -1
 			m.liveInput = ""
 
-			echo := m.styles.Prompt.Render(m.prompt) + m.styles.Input.Render(line)
+			echo := m.renderPrompt() + m.styles.Input.Render(line)
 			m.echoes = append(m.echoes, echo)
 
 			cmds := append(initCmds, tea.Println(echo))
@@ -197,7 +255,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.pushHistory(line)
 			m.submissions = append(m.submissions, line)
 
-			result := m.evaluate(line)
+			result := m.evaluate(m.currentModeName(), line)
 
 			if result.Output != "" {
 				out := m.styles.Output.Render(result.Output)
@@ -227,6 +285,29 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.navigateHistory(1)
 
 			return m, tea.Sequence(initCmds...)
+
+		case tea.KeyBackspace:
+			// Backspace on an empty prompt in a non-default mode
+			// returns to the default mode (Julia REPL convention).
+			// Any other backspace falls through to textinput.
+			if !m.singleMode && m.modeIdx != 0 && m.input.Value() == "" {
+				m.modeIdx = 0
+
+				return m, tea.Sequence(initCmds...)
+			}
+
+		case tea.KeyRunes:
+			// Julia-style mode activation: a single activator rune
+			// typed on an empty prompt switches modes instead of
+			// inserting the rune. Multi-rune inputs (paste, IME)
+			// fall through to textinput normally.
+			if !m.singleMode && m.input.Value() == "" && len(msg.Runes) == 1 {
+				if idx, ok := m.activators[msg.Runes[0]]; ok && idx != m.modeIdx {
+					m.modeIdx = idx
+
+					return m, tea.Sequence(initCmds...)
+				}
+			}
 		}
 	}
 
@@ -245,8 +326,40 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // scrollback via tea.Println, so scroll wheel, selection, and shell
 // history all continue to work as the user expects.
 func (m Model) View() string {
-	return m.styles.Prompt.Render(m.prompt) + m.input.View()
+	return m.renderPrompt() + m.input.View()
 }
+
+// renderPrompt returns the styled prompt for the current mode.
+// Handles both single-mode (Options.Prompt) and multi-mode
+// (Options.Modes[modeIdx]) configurations.
+func (m Model) renderPrompt() string {
+	if m.singleMode {
+		return m.styles.Prompt.Render(m.fixedPrompt)
+	}
+
+	mode := m.modes[m.modeIdx]
+
+	style := m.styles.Prompt
+	if mode.PromptColor != nil {
+		style = style.Foreground(mode.PromptColor)
+	}
+
+	return style.Render(mode.Prompt)
+}
+
+// currentModeName returns the active mode's Name, or "" for a
+// single-mode REPL.
+func (m Model) currentModeName() string {
+	if m.singleMode {
+		return ""
+	}
+
+	return m.modes[m.modeIdx].Name
+}
+
+// CurrentMode returns the active mode's Name. Useful for tests and
+// callers that want to observe or persist the mode across sessions.
+func (m Model) CurrentMode() string { return m.currentModeName() }
 
 // pushHistory records line in the ring buffer, trimming the oldest
 // entry when HistoryLimit is exceeded.

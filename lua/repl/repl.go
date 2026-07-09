@@ -187,7 +187,7 @@ func Run(opts Options) error {
 	prompt := opts.AppName + "(" + opts.Mode.String() + ")> "
 
 	if opts.Interactive {
-		return runInteractive(env, tealSession, isTeal, prompt, strings.Join(bannerLines, "\n"))
+		return runInteractive(env, tealSession, isTeal, opts.AppName, strings.Join(bannerLines, "\n"))
 	}
 
 	return runScripted(env, tealSession, isTeal, opts, prompt, bannerLines)
@@ -242,16 +242,32 @@ func runScripted(env *hexlua.Environment, session *teal.Session, isTeal bool, op
 }
 
 // runInteractive drives the REPL through hex/tui/components/repl,
-// a Bubble Tea component with arrow-key editing, history, and
-// styled output. Requires a TTY on stdin.
-func runInteractive(env *hexlua.Environment, session *teal.Session, isTeal bool, prompt, banner string) error {
+// a Bubble Tea component with arrow-key editing, history, styled
+// output, and Julia-style mode switching. Requires a TTY on stdin.
+//
+// Two modes are wired here:
+//
+//	"teal" — default when the user launched with Teal (prompt
+//	         color #3e8b9b, hex's teal-tinted cyan). Activator: 't'
+//	         from another mode's empty prompt.
+//	"lua"  — default when the user launched with --mode lua
+//	         (prompt color #000080, Lua's classic navy).
+//	         Activator: 'l' from another mode's empty prompt.
+//
+// Julia-style: pressing 't' or 'l' at an empty prompt switches
+// modes. Pressing Backspace at an empty prompt in a non-default
+// mode returns to the default.
+func runInteractive(env *hexlua.Environment, session *teal.Session, isTeal bool, appName, banner string) error {
 	// evaluator is a synchronous closure the TUI calls for each
 	// submitted line. Print output from Lua is redirected into the
 	// same buffer as expression-return values so Result.Output
 	// contains everything the user typed produced — no output goes
 	// to os.Stdout during a REPL evaluation, which would otherwise
 	// clobber Bubble Tea's render.
-	evaluator := func(line string) tuirepl.Result {
+	//
+	// The mode argument comes from the TUI's current mode, so
+	// runtime language selection follows the visible prompt.
+	evaluator := func(mode, line string) tuirepl.Result {
 		if isExitDirective(line) {
 			return tuirepl.Result{Exit: true}
 		}
@@ -262,11 +278,21 @@ func runInteractive(env *hexlua.Environment, session *teal.Session, isTeal bool,
 		env.SetStdout(&outBuf)
 		defer env.SetStdout(origStdout)
 
-		if err := evalLine(env, &outBuf, line, isTeal, session); err != nil {
+		modeIsTeal := mode == "teal"
+
+		// The Teal session only participates when this line is
+		// Teal-mode. Lua-mode lines skip the session and go through
+		// gopher-lua's own compilation path.
+		var sess *teal.Session
+		if modeIsTeal {
+			sess = session
+		}
+
+		if err := evalLine(env, &outBuf, line, modeIsTeal, sess); err != nil {
 			msg := trimTraceback(err.Error())
 			errText := "error: " + msg
 
-			if isTeal {
+			if modeIsTeal {
 				if hint := tealErrorHint(msg); hint != "" {
 					errText += "\n" + hint
 				}
@@ -278,22 +304,35 @@ func runInteractive(env *hexlua.Environment, session *teal.Session, isTeal bool,
 		return tuirepl.Result{Output: strings.TrimRight(outBuf.String(), "\n")}
 	}
 
+	tealMode := tuirepl.Mode{
+		Name:        "teal",
+		Activator:   't',
+		Prompt:      appName + "(teal)> ",
+		PromptColor: lipgloss.Color("#3e8b9b"),
+	}
+
+	luaMode := tuirepl.Mode{
+		Name:        "lua",
+		Activator:   'l',
+		Prompt:      appName + "(lua)> ",
+		PromptColor: lipgloss.Color("#000080"),
+	}
+
+	// The FIRST mode in the slice is the default — what the user
+	// started with, and what Backspace-at-empty returns them to.
+	var modes []tuirepl.Mode
+	if isTeal {
+		modes = []tuirepl.Mode{tealMode, luaMode}
+	} else {
+		modes = []tuirepl.Mode{luaMode, tealMode}
+	}
+
 	model := tuirepl.New(tuirepl.Options{
-		Prompt:       prompt,
 		Banner:       banner,
 		Evaluator:    evaluator,
+		Modes:        modes,
 		HistoryLimit: 1000,
 	})
-
-	// Prompt color varies by mode so users can tell at a glance
-	// which language they're in:
-	//   Teal — hex's #3e8b9b (teal-tinted cyan, ships as default)
-	//   Lua  — Lua's classic navy #000080
-	if !isTeal {
-		styles := model.Styles()
-		styles.Prompt = styles.Prompt.Foreground(lipgloss.Color("#000080"))
-		model = model.SetStyles(styles)
-	}
 
 	// Inline mode (no alt-screen): the model only renders the input
 	// line via View, and pushes everything else into the terminal's

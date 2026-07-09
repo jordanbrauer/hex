@@ -36,7 +36,7 @@ func TestEvaluatorCalledOnEnter(t *testing.T) {
 
 	m := New(Options{
 		Prompt: "> ",
-		Evaluator: func(line string) Result {
+		Evaluator: func(mode, line string) Result {
 			received = line
 
 			return Result{Output: "ok"}
@@ -62,7 +62,7 @@ func TestEvaluatorCalledOnEnter(t *testing.T) {
 
 func TestEmptyLineNotSubmitted(t *testing.T) {
 	m := New(Options{
-		Evaluator: func(line string) Result {
+		Evaluator: func(mode, line string) Result {
 			t.Errorf("evaluator called with empty line: %q", line)
 
 			return Result{}
@@ -78,7 +78,7 @@ func TestEmptyLineNotSubmitted(t *testing.T) {
 
 func TestExitResultQuits(t *testing.T) {
 	m := New(Options{
-		Evaluator: func(line string) Result {
+		Evaluator: func(mode, line string) Result {
 			return Result{Exit: true}
 		},
 	})
@@ -99,7 +99,7 @@ func TestExitResultQuits(t *testing.T) {
 
 func TestCtrlDQuits(t *testing.T) {
 	m := New(Options{
-		Evaluator: func(line string) Result { return Result{} },
+		Evaluator: func(mode, line string) Result { return Result{} },
 	})
 
 	newModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlD})
@@ -116,7 +116,7 @@ func TestCtrlDQuits(t *testing.T) {
 
 func TestHistoryUpDown(t *testing.T) {
 	m := New(Options{
-		Evaluator: func(line string) Result { return Result{} },
+		Evaluator: func(mode, line string) Result { return Result{} },
 	})
 
 	for _, line := range []string{"one", "two", "three"} {
@@ -154,7 +154,7 @@ func TestHistoryUpDown(t *testing.T) {
 func TestBannerEmittedOnFirstUpdate(t *testing.T) {
 	m := New(Options{
 		Banner:    "welcome",
-		Evaluator: func(line string) Result { return Result{} },
+		Evaluator: func(mode, line string) Result { return Result{} },
 	})
 
 	// Trigger any Update — even a no-op key.
@@ -169,7 +169,7 @@ func TestBannerEmittedOnFirstUpdate(t *testing.T) {
 func TestBannerEmittedOnce(t *testing.T) {
 	m := New(Options{
 		Banner:    "welcome",
-		Evaluator: func(line string) Result { return Result{} },
+		Evaluator: func(mode, line string) Result { return Result{} },
 	})
 
 	m = press(t, m, tea.KeyRunes, 'x')
@@ -184,7 +184,7 @@ func TestBannerEmittedOnce(t *testing.T) {
 func TestHistoryLimit(t *testing.T) {
 	m := New(Options{
 		HistoryLimit: 2,
-		Evaluator:    func(line string) Result { return Result{} },
+		Evaluator:    func(mode, line string) Result { return Result{} },
 	})
 
 	for _, line := range []string{"a", "b", "c"} {
@@ -203,7 +203,7 @@ func TestHistoryLimit(t *testing.T) {
 
 func TestErrorResultRenders(t *testing.T) {
 	m := New(Options{
-		Evaluator: func(line string) Result {
+		Evaluator: func(mode, line string) Result {
 			return Result{Err: "boom"}
 		},
 	})
@@ -217,14 +217,110 @@ func TestErrorResultRenders(t *testing.T) {
 	}
 }
 
+func TestModes_activatorSwitchesMode(t *testing.T) {
+	var seen []string
+
+	m := New(Options{
+		Modes: []Mode{
+			{Name: "teal", Activator: 't', Prompt: "(teal)> "},
+			{Name: "lua", Activator: 'l', Prompt: "(lua)> "},
+		},
+		Evaluator: func(mode, line string) Result {
+			seen = append(seen, mode+":"+line)
+
+			return Result{}
+		},
+	})
+
+	if got := m.CurrentMode(); got != "teal" {
+		t.Fatalf("initial mode = %q, want teal", got)
+	}
+
+	m = press(t, m, tea.KeyRunes, 'l')
+	if got := m.CurrentMode(); got != "lua" {
+		t.Fatalf("after 'l' on empty prompt: mode = %q, want lua", got)
+	}
+
+	if m.input.Value() != "" {
+		t.Errorf("activator rune should not be inserted; input = %q", m.input.Value())
+	}
+
+	m = typeString(t, m, "x=1")
+	m = press(t, m, tea.KeyEnter)
+
+	if len(seen) != 1 || seen[0] != "lua:x=1" {
+		t.Errorf("evaluator saw %v, want [lua:x=1]", seen)
+	}
+}
+
+func TestModes_activatorIgnoredMidInput(t *testing.T) {
+	m := New(Options{
+		Modes: []Mode{
+			{Name: "teal", Activator: 't', Prompt: "(teal)> "},
+			{Name: "lua", Activator: 'l', Prompt: "(lua)> "},
+		},
+		Evaluator: func(mode, line string) Result { return Result{} },
+	})
+
+	m = press(t, m, tea.KeyRunes, 'x')
+	m = press(t, m, tea.KeyRunes, 'l')
+
+	if got := m.CurrentMode(); got != "teal" {
+		t.Errorf("activator mid-input should not switch: mode = %q", got)
+	}
+
+	if got := m.input.Value(); got != "xl" {
+		t.Errorf("input = %q, want xl", got)
+	}
+}
+
+func TestModes_backspaceReturnsToDefault(t *testing.T) {
+	m := New(Options{
+		Modes: []Mode{
+			{Name: "teal", Activator: 't', Prompt: "(teal)> "},
+			{Name: "lua", Activator: 'l', Prompt: "(lua)> "},
+		},
+		Evaluator: func(mode, line string) Result { return Result{} },
+	})
+
+	m = press(t, m, tea.KeyRunes, 'l')
+	if got := m.CurrentMode(); got != "lua" {
+		t.Fatalf("expected lua, got %q", got)
+	}
+
+	m = press(t, m, tea.KeyBackspace)
+	if got := m.CurrentMode(); got != "teal" {
+		t.Errorf("backspace should return to default, got %q", got)
+	}
+}
+
+func TestModes_backspaceMidInputDoesNotSwitchMode(t *testing.T) {
+	m := New(Options{
+		Modes: []Mode{
+			{Name: "teal", Activator: 't', Prompt: "(teal)> "},
+			{Name: "lua", Activator: 'l', Prompt: "(lua)> "},
+		},
+		Evaluator: func(mode, line string) Result { return Result{} },
+	})
+
+	m = press(t, m, tea.KeyRunes, 'l')
+	m = typeString(t, m, "ab")
+	m = press(t, m, tea.KeyBackspace)
+
+	if got := m.CurrentMode(); got != "lua" {
+		t.Errorf("backspace mid-input switched mode to %q", got)
+	}
+
+	if got := m.input.Value(); got != "a" {
+		t.Errorf("input = %q, want 'a'", got)
+	}
+}
+
 func TestViewIsOnlyPromptLine(t *testing.T) {
-	// The whole point of the tea.Println-driven design: View() only
-	// contains the current prompt line, so terminal scrollback stays
-	// untouched.
 	m := New(Options{
 		Prompt:    "> ",
 		Banner:    "welcome",
-		Evaluator: func(line string) Result { return Result{Output: "ok"} },
+		Evaluator: func(_, _ string) Result { return Result{Output: "ok"} },
 	})
 
 	m = typeString(t, m, "hi")

@@ -19,10 +19,30 @@ myapp(teal)> for _, u in ipairs(rows) do print(u.id, u.name) end
 
 - **Teal** (default): strict typechecking against the `.d.tl` stubs
   each framework module ships. Argument type errors are caught
-  before execution.
+  before execution. Prompt color: `#3e8b9b` (teal-tinted cyan).
 - **Lua** (`--mode lua` or `repl.toml`: `mode = "lua"`): looser Lua
   semantics; implicit globals allowed; no typecheck. Use this when
   Teal's strictness gets in the way for a quick prototype.
+  Prompt color: `#000080` (Lua's classic navy).
+
+### Switching modes at runtime (Julia-style)
+
+At an **empty prompt**, single-key activators swap modes without
+quitting the REPL:
+
+| Key         | Effect                                          |
+|-------------|-------------------------------------------------|
+| `t`         | switch to Teal mode                             |
+| `l`         | switch to Lua mode                              |
+| Backspace   | return to the mode you launched with (default)  |
+
+The activator only fires when the input line is empty — typing `l`
+mid-word still inserts an `l`. The prompt color updates immediately
+so you can see which language your next line will run against.
+
+The Lua environment is shared, so globals set in one mode are
+visible from the other (subject to Teal's chunk-local locals
+caveat). Framework modules stay registered in both.
 
 ## Built-in modules
 
