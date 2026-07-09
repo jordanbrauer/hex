@@ -39,17 +39,34 @@ race:
 # Run go vet.
 vet:
     go vet ./...
-
+{{ if .Lint }}
+# Run golangci-lint.
+lint:
+    golangci-lint run ./...
+{{ end -}}
 # Format all Go source in place.
 fmt:
     gofmt -s -w .
 
+# Verify formatting is clean; fail if anything would change.
+fmt-check:
+    #!/usr/bin/env bash
+    diff=$(gofmt -s -l .)
+    if [ -n "$diff" ]; then
+        echo "unformatted files:"; echo "$diff"; exit 1
+    fi
+
 # Tidy the module graph.
 tidy:
     go mod tidy
-
-# Full pre-commit gate: vet + race tests.
-check: vet race
+{{ if .Goreleaser }}
+# Build a snapshot release with goreleaser, skipping publish. Install
+# once: `go install github.com/goreleaser/goreleaser/v2@latest`
+release-dry-run:
+    goreleaser release --snapshot --clean
+{{ end -}}
+# Full pre-commit gate: format check{{ if .Lint }}, lint{{ end }}, vet, race tests.
+check: fmt-check{{ if .Lint }} lint{{ end }} vet race
 {{ if .HasFrontend }}
 # Frontend recipes ---------------------------------------------------
 

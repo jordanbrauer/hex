@@ -49,6 +49,13 @@ type initConfig struct {
 	AI          string // "openai" | "anthropic" | "none"
 	Frontend    string // "js" | "ts" | "none"
 
+	// Developer tooling. On by default; pass the matching --no-x style
+	// flag (e.g. --editorconfig=false) to opt out.
+	Editorconfig  bool
+	Lint          bool // .golangci.yml
+	Goreleaser    bool // .goreleaser.yaml
+	GithubActions bool // .github/workflows/release.yml; requires Goreleaser
+
 	// GoVersion is the Go directive (e.g. "1.26"). Defaults to the
 	// running toolchain.
 	GoVersion string
@@ -80,22 +87,69 @@ func (c initConfig) HasFrontend() bool {
 // scaffolded (vs the no-build JS variant).
 func (c initConfig) FrontendTS() bool { return c.Frontend == "ts" }
 
+// HasGithubActions reports whether the release workflow should be
+// scaffolded. GithubActions implies Goreleaser (see applyExtras).
+func (c initConfig) HasGithubActions() bool { return c.GithubActions && c.Goreleaser }
+
+// GitHubOwner returns the GitHub org/user segment of ModulePath when it
+// points at github.com, or a placeholder otherwise.
+func (c initConfig) GitHubOwner() string {
+	owner, _, ok := githubSlug(c.ModulePath)
+	if !ok {
+		return "your-org"
+	}
+
+	return owner
+}
+
+// GitHubRepo returns the GitHub repository segment of ModulePath when it
+// points at github.com, or the project name otherwise.
+func (c initConfig) GitHubRepo() string {
+	_, repo, ok := githubSlug(c.ModulePath)
+	if !ok {
+		return c.Name
+	}
+
+	return repo
+}
+
+// githubSlug extracts owner/repo from a github.com/owner/repo[/...]
+// module path.
+func githubSlug(modulePath string) (owner, repo string, ok bool) {
+	const prefix = "github.com/"
+	if !strings.HasPrefix(modulePath, prefix) {
+		return "", "", false
+	}
+
+	rest := strings.TrimPrefix(modulePath, prefix)
+	parts := strings.SplitN(rest, "/", 3)
+	if len(parts) < 2 || parts[0] == "" || parts[1] == "" {
+		return "", "", false
+	}
+
+	return parts[0], parts[1], true
+}
+
 func newInitCommand() *cobra.Command {
 	var (
-		modulePath  string
-		dialect     string
-		cache       bool
-		cron        bool
-		web         bool
-		queue       string
-		telemetry   string
-		policy      bool
-		i18nFlag    bool
-		featureflag bool
-		aiFlag      string
-		frontend    string
-		yes         bool
-		flags       genFlags
+		modulePath    string
+		dialect       string
+		cache         bool
+		cron          bool
+		web           bool
+		queue         string
+		telemetry     string
+		policy        bool
+		i18nFlag      bool
+		featureflag   bool
+		aiFlag        string
+		frontend      string
+		editorconfig  bool
+		lint          bool
+		goreleaser    bool
+		githubActions bool
+		yes           bool
+		flags         genFlags
 	)
 
 	cmd := &cobra.Command{
@@ -105,19 +159,23 @@ func newInitCommand() *cobra.Command {
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := resolveInitConfig(args, resolveFlags{
-				module:      modulePath,
-				dialect:     dialect,
-				cache:       cache,
-				cron:        cron,
-				web:         web,
-				queue:       queue,
-				telemetry:   telemetry,
-				policy:      policy,
-				i18n:        i18nFlag,
-				featureflag: featureflag,
-				ai:          aiFlag,
-				frontend:    frontend,
-				yes:         yes,
+				module:        modulePath,
+				dialect:       dialect,
+				cache:         cache,
+				cron:          cron,
+				web:           web,
+				queue:         queue,
+				telemetry:     telemetry,
+				policy:        policy,
+				i18n:          i18nFlag,
+				featureflag:   featureflag,
+				ai:            aiFlag,
+				frontend:      frontend,
+				editorconfig:  editorconfig,
+				lint:          lint,
+				goreleaser:    goreleaser,
+				githubActions: githubActions,
+				yes:           yes,
 			})
 			if err != nil {
 				return err
@@ -156,6 +214,10 @@ func newInitCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&featureflag, "featureflag", false, "scaffold a featureflag (GOFF) provider")
 	cmd.Flags().StringVar(&aiFlag, "ai", "none", "AI provider: openai, anthropic, none")
 	cmd.Flags().StringVar(&frontend, "frontend", "none", "frontend stack: js (no build), ts (Laravel Mix), none (default)")
+	cmd.Flags().BoolVar(&editorconfig, "editorconfig", true, "scaffold an .editorconfig")
+	cmd.Flags().BoolVar(&lint, "lint", true, "scaffold a .golangci.yml lint config")
+	cmd.Flags().BoolVar(&goreleaser, "goreleaser", true, "scaffold a .goreleaser.yaml release config")
+	cmd.Flags().BoolVar(&githubActions, "github", false, "scaffold a GitHub Actions release workflow (implies --goreleaser)")
 	cmd.Flags().BoolVar(&yes, "yes", false, "skip interactive prompts, use flag defaults")
 	setExample(cmd, "init")
 	addGeneratorFlags(cmd, &flags)
@@ -166,37 +228,45 @@ func newInitCommand() *cobra.Command {
 // resolveFlags carries flag values from newInitCommand into
 // resolveInitConfig without expanding the argument list.
 type resolveFlags struct {
-	module      string
-	dialect     string
-	cache       bool
-	cron        bool
-	web         bool
-	queue       string
-	telemetry   string
-	policy      bool
-	i18n        bool
-	featureflag bool
-	ai          string
-	frontend    string
-	yes         bool
+	module        string
+	dialect       string
+	cache         bool
+	cron          bool
+	web           bool
+	queue         string
+	telemetry     string
+	policy        bool
+	i18n          bool
+	featureflag   bool
+	ai            string
+	frontend      string
+	editorconfig  bool
+	lint          bool
+	goreleaser    bool
+	githubActions bool
+	yes           bool
 }
 
 // resolveInitConfig combines CLI args, flags, and interactive prompts
 // into a fully-populated initConfig.
 func resolveInitConfig(args []string, f resolveFlags) (initConfig, error) {
 	cfg := initConfig{
-		Dialect:     f.dialect,
-		ModulePath:  f.module,
-		Cache:       f.cache,
-		Cron:        f.cron,
-		Web:         f.web,
-		Queue:       f.queue,
-		Telemetry:   f.telemetry,
-		Policy:      f.policy,
-		I18n:        f.i18n,
-		Featureflag: f.featureflag,
-		AI:          f.ai,
-		Frontend:    f.frontend,
+		Dialect:       f.dialect,
+		ModulePath:    f.module,
+		Cache:         f.cache,
+		Cron:          f.cron,
+		Web:           f.web,
+		Queue:         f.queue,
+		Telemetry:     f.telemetry,
+		Policy:        f.policy,
+		I18n:          f.i18n,
+		Featureflag:   f.featureflag,
+		AI:            f.ai,
+		Frontend:      f.frontend,
+		Editorconfig:  f.editorconfig,
+		Lint:          f.lint,
+		Goreleaser:    f.goreleaser,
+		GithubActions: f.githubActions,
 	}
 
 	// Resolve the target directory + project name.
@@ -228,6 +298,7 @@ func resolveInitConfig(args []string, f resolveFlags) (initConfig, error) {
 	}
 
 	cfg.GoVersion = runningGoVersion()
+	cfg.applyToolingDefaults()
 
 	if f.yes {
 		return cfg, cfg.validate()
@@ -290,6 +361,26 @@ func runInitPrompts(cfg *initConfig) error {
 		}
 	}
 
+	// Developer tooling defaults to on (editorconfig, lint, goreleaser);
+	// github actions defaults to off. Pre-select from whatever the
+	// flags resolved to.
+	tooling := []string{}
+	if cfg.Editorconfig {
+		tooling = append(tooling, "editorconfig")
+	}
+
+	if cfg.Lint {
+		tooling = append(tooling, "lint")
+	}
+
+	if cfg.Goreleaser {
+		tooling = append(tooling, "goreleaser")
+	}
+
+	if cfg.GithubActions {
+		tooling = append(tooling, "github")
+	}
+
 	form := huh.NewForm(
 		huh.NewGroup(
 			huh.NewInput().
@@ -325,6 +416,16 @@ func runInitPrompts(cfg *initConfig) error {
 					huh.NewOption("frontend-ts  (htmx + alpine + tailwind + laravel-mix TS build)", "frontend-ts"),
 				).
 				Value(&extras),
+			huh.NewMultiSelect[string]().
+				Title("Developer tooling").
+				Description("space to toggle; enter to confirm").
+				Options(
+					huh.NewOption("editorconfig (.editorconfig)", "editorconfig"),
+					huh.NewOption("lint         (.golangci.yml)", "lint"),
+					huh.NewOption("goreleaser   (.goreleaser.yaml)", "goreleaser"),
+					huh.NewOption("github       (release workflow; implies goreleaser)", "github"),
+				).
+				Value(&tooling),
 		),
 	)
 
@@ -333,6 +434,7 @@ func runInitPrompts(cfg *initConfig) error {
 	}
 
 	applyExtras(cfg, extras)
+	applyTooling(cfg, tooling)
 
 	return nil
 }
@@ -392,6 +494,25 @@ func applyExtras(cfg *initConfig, extras []string) {
 	}
 }
 
+// applyTooling flips the cfg dev-tooling booleans based on the
+// multi-select result. GithubActions requires Goreleaser — auto-enable
+// it if the user picked github but forgot goreleaser.
+func applyTooling(cfg *initConfig, tooling []string) {
+	set := make(map[string]bool, len(tooling))
+	for _, t := range tooling {
+		set[t] = true
+	}
+
+	cfg.Editorconfig = set["editorconfig"]
+	cfg.Lint = set["lint"]
+	cfg.Goreleaser = set["goreleaser"]
+	cfg.GithubActions = set["github"]
+
+	if cfg.GithubActions {
+		cfg.Goreleaser = true
+	}
+}
+
 // validate rejects an initConfig with obviously bad inputs.
 func (c initConfig) validate() error {
 	if c.Name == "" {
@@ -441,6 +562,15 @@ func (c initConfig) validate() error {
 	}
 
 	return nil
+}
+
+// applyToolingDefaults auto-enables Goreleaser when GithubActions is
+// requested via flags (the --yes / non-interactive path doesn't go
+// through applyTooling).
+func (c *initConfig) applyToolingDefaults() {
+	if c.GithubActions {
+		c.Goreleaser = true
+	}
 }
 
 // scaffold materialises the project files at cfg.Directory using the
@@ -500,6 +630,22 @@ func scaffold(g *generator, cfg initConfig) error {
 
 	if cfg.HasFrontend() {
 		files = append(files, frontendFiles(cfg)...)
+	}
+
+	if cfg.Editorconfig {
+		files = append(files, fileSpec{"templates/init/editorconfig.tmpl", filepath.Join(cfg.Directory, ".editorconfig")})
+	}
+
+	if cfg.Lint {
+		files = append(files, fileSpec{"templates/init/golangci.yml.tmpl", filepath.Join(cfg.Directory, ".golangci.yml")})
+	}
+
+	if cfg.Goreleaser {
+		files = append(files, fileSpec{"templates/init/goreleaser.yaml.tmpl", filepath.Join(cfg.Directory, ".goreleaser.yaml")})
+	}
+
+	if cfg.HasGithubActions() {
+		files = append(files, fileSpec{"templates/init/github/release.yml.tmpl", filepath.Join(cfg.Directory, ".github", "workflows", "release.yml")})
 	}
 
 	for _, f := range files {
