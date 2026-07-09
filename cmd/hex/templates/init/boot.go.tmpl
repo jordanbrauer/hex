@@ -59,6 +59,7 @@ func Boot(kernel *hex.App) error {
 {{- end }}
 		&provider.Routes{},
 {{- end }}
+		provider.ReplBindings(),
 		// hex:providers
 	)
 }

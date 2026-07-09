@@ -549,6 +549,7 @@ func coreFiles(cfg initConfig) []fileSpec {
 		{"templates/init/provider_config.go.tmpl", filepath.Join(cfg.Directory, "app", "provider", "config.go")},
 		{"templates/init/provider_log.go.tmpl", filepath.Join(cfg.Directory, "app", "provider", "log.go")},
 		{"templates/init/provider_lua.go.tmpl", filepath.Join(cfg.Directory, "app", "provider", "lua.go")},
+		{"templates/init/provider_repl_bindings.go.tmpl", filepath.Join(cfg.Directory, "app", "provider", "repl_bindings.go")},
 		{"templates/init/justfile.tmpl", filepath.Join(cfg.Directory, "justfile")},
 		{"templates/init/gitignore.tmpl", filepath.Join(cfg.Directory, ".gitignore")},
 		{"templates/init/env.dist.tmpl", filepath.Join(cfg.Directory, ".env.dist")},
