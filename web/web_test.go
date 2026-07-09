@@ -15,9 +15,16 @@ import (
 	"github.com/jordanbrauer/hex/web"
 )
 
-// startServer picks a free port, starts the server in a goroutine, and
+// startServer picks a free port, applies each setup callback to the
+// underlying *echo.Echo, starts the server in a goroutine, and
 // returns the base URL plus a cleanup func.
-func startServer(t *testing.T, opts web.Options) (*web.Server, string, func()) {
+//
+// setup callbacks run BEFORE Start() so any routes/middleware they
+// register are wired safely. Adding routes after Start() while the
+// accept loop is dispatching requests is a data race in Echo's trie
+// router (surfaces as intermittent EOF errors on the very first
+// request after registration).
+func startServer(t *testing.T, opts web.Options, setup ...func(*echo.Echo)) (*web.Server, string, func()) {
 	t.Helper()
 
 	if opts.Address == "" {
@@ -32,6 +39,10 @@ func startServer(t *testing.T, opts web.Options) (*web.Server, string, func()) {
 	}
 
 	srv := web.New(opts)
+
+	for _, fn := range setup {
+		fn(srv.Echo())
+	}
 
 	go func() {
 		if err := srv.Start(); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -189,12 +200,12 @@ func TestCustomPath(t *testing.T) {
 }
 
 func TestUserRouteWorks(t *testing.T) {
-	srv, base, cleanup := startServer(t, web.Options{})
-	defer cleanup()
-
-	srv.Echo().GET("/hello/:name", func(c echo.Context) error {
-		return c.String(http.StatusOK, "hi "+c.Param("name"))
+	_, base, cleanup := startServer(t, web.Options{}, func(e *echo.Echo) {
+		e.GET("/hello/:name", func(c echo.Context) error {
+			return c.String(http.StatusOK, "hi "+c.Param("name"))
+		})
 	})
+	defer cleanup()
 
 	resp, err := http.Get(base + "/hello/world")
 	if err != nil {
@@ -210,12 +221,12 @@ func TestUserRouteWorks(t *testing.T) {
 }
 
 func TestRequestID_defaultOn(t *testing.T) {
-	srv, base, cleanup := startServer(t, web.Options{})
-	defer cleanup()
-
-	srv.Echo().GET("/id", func(c echo.Context) error {
-		return c.String(http.StatusOK, c.Response().Header().Get(echo.HeaderXRequestID))
+	_, base, cleanup := startServer(t, web.Options{}, func(e *echo.Echo) {
+		e.GET("/id", func(c echo.Context) error {
+			return c.String(http.StatusOK, c.Response().Header().Get(echo.HeaderXRequestID))
+		})
 	})
+	defer cleanup()
 
 	resp, err := http.Get(base + "/id")
 	if err != nil {
@@ -235,12 +246,12 @@ func TestRequestID_defaultOn(t *testing.T) {
 }
 
 func TestRequestID_disabled(t *testing.T) {
-	srv, base, cleanup := startServer(t, web.Options{DisableRequestID: true})
-	defer cleanup()
-
-	srv.Echo().GET("/id", func(c echo.Context) error {
-		return c.String(http.StatusOK, "ok")
+	_, base, cleanup := startServer(t, web.Options{DisableRequestID: true}, func(e *echo.Echo) {
+		e.GET("/id", func(c echo.Context) error {
+			return c.String(http.StatusOK, "ok")
+		})
 	})
+	defer cleanup()
 
 	resp, err := http.Get(base + "/id")
 	if err != nil {
@@ -255,12 +266,12 @@ func TestRequestID_disabled(t *testing.T) {
 }
 
 func TestRecover_catchesPanic(t *testing.T) {
-	srv, base, cleanup := startServer(t, web.Options{})
-	defer cleanup()
-
-	srv.Echo().GET("/boom", func(c echo.Context) error {
-		panic("kaboom")
+	_, base, cleanup := startServer(t, web.Options{}, func(e *echo.Echo) {
+		e.GET("/boom", func(c echo.Context) error {
+			panic("kaboom")
+		})
 	})
+	defer cleanup()
 
 	resp, err := http.Get(base + "/boom")
 	if err != nil {
@@ -287,12 +298,12 @@ func TestRecover_catchesPanic(t *testing.T) {
 }
 
 func TestCORS_optIn(t *testing.T) {
-	srv, base, cleanup := startServer(t, web.Options{CORS: true})
-	defer cleanup()
-
-	srv.Echo().GET("/x", func(c echo.Context) error {
-		return c.String(http.StatusOK, "ok")
+	_, base, cleanup := startServer(t, web.Options{CORS: true}, func(e *echo.Echo) {
+		e.GET("/x", func(c echo.Context) error {
+			return c.String(http.StatusOK, "ok")
+		})
 	})
+	defer cleanup()
 
 	req, _ := http.NewRequest("OPTIONS", base+"/x", nil)
 	req.Header.Set("Origin", "https://example.com")
@@ -311,12 +322,12 @@ func TestCORS_optIn(t *testing.T) {
 }
 
 func TestCORS_defaultOff(t *testing.T) {
-	srv, base, cleanup := startServer(t, web.Options{})
-	defer cleanup()
-
-	srv.Echo().GET("/x", func(c echo.Context) error {
-		return c.String(http.StatusOK, "ok")
+	_, base, cleanup := startServer(t, web.Options{}, func(e *echo.Echo) {
+		e.GET("/x", func(c echo.Context) error {
+			return c.String(http.StatusOK, "ok")
+		})
 	})
+	defer cleanup()
 
 	req, _ := http.NewRequest("OPTIONS", base+"/x", nil)
 	req.Header.Set("Origin", "https://example.com")

@@ -152,14 +152,12 @@ Every PR must pass `just check` before merging. CI mirrors this gate:
 
 ## Known flaky tests
 
-Two tests are known-flaky under `-race` in CI. Do not treat their
-failures as blocking unless you're specifically debugging them:
+One test is known-flaky under `-race` in CI. Do not treat its
+failures as blocking unless you're specifically debugging it:
 
 - `queue/memory.TestCompetingConsumers_splitStream`
-- `web.TestUserRouteWorks`
 
-If you fix either, note it in the PR and remove the entry from this
-list.
+If you fix it, note it in the PR and remove the entry from this list.
 
 ## Dependency policy
 

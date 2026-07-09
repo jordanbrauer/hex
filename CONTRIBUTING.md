@@ -144,13 +144,12 @@ Full detail lives in [`AGENTS.md`](./AGENTS.md). The most-cited ones:
 
 ## Known flaky tests
 
-Two tests are known-flaky under `-race`. Do not treat them as blocking
-unless you're specifically debugging them:
+One test is known-flaky under `-race`. Do not treat it as blocking
+unless you're specifically debugging it:
 
 - `queue/memory.TestCompetingConsumers_splitStream`
-- `web.TestUserRouteWorks`
 
-If you fix either, note it in the PR and remove it from this list (and
+If you fix it, note it in the PR and remove it from this list (and
 from the equivalent list in `AGENTS.md`).
 
 ## Code of conduct

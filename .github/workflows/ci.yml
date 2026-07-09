@@ -96,10 +96,20 @@ jobs:
       # blips, or missing tokens should never fail an otherwise-
       # passing build. Threshold checks (see .codecov.yml) are also
       # informational, so nothing coverage-related blocks a merge.
+      #
+      # `if: always()` runs the upload even when the test step failed,
+      # so partial coverage is still visible on flaky CI runs.
+      #
+      # Every matrix leg uploads with an OS flag. Codecov unions
+      # coverage across flags (atomic mode reports hit/miss, not
+      # counters — no double-counting) and surfaces per-OS breakdowns
+      # in the UI. Catches OS-specific code paths that only one leg
+      # exercises.
       - name: Upload coverage to Codecov
-        if: matrix.os == 'ubuntu-latest'
+        if: always()
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage.txt
+          flags: ${{ matrix.os }}
           fail_ci_if_error: false
