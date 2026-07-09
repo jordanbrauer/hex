@@ -50,8 +50,8 @@ func TestLoad_defaults_perFileNamespace(t *testing.T) {
 		t.Errorf("server.port = %d, want 8080", got)
 	}
 
-	if got := s.String("myapp.log.level"); got != "info" {
-		t.Errorf("myapp.log.level = %q, want info", got)
+	if got := s.String("example.log.level"); got != "info" {
+		t.Errorf("example.log.level = %q, want info", got)
 	}
 }
 
@@ -84,7 +84,7 @@ func TestLoad_pathWithoutNamespaceReturnsZero(t *testing.T) {
 func TestLoad_userDirOverridesDefaults(t *testing.T) {
 	userDir := t.TempDir()
 
-	// Override server.port only. myapp and database are untouched.
+	// Override server.port only. example and database are untouched.
 	if err := os.WriteFile(
 		filepath.Join(userDir, "server.toml"),
 		[]byte("port = 9090\n"),
@@ -195,7 +195,7 @@ func TestLoad_envOverridesUserFile(t *testing.T) {
 }
 
 func TestLoad_envMapDottedKeyBindsNestedTOML(t *testing.T) {
-	// myapp.toml has [log] level; env.yaml binds myapp.log.level -> TEST_LOG_LEVEL
+	// example.toml has [log] level; env.yaml binds example.log.level -> TEST_LOG_LEVEL
 	t.Setenv("TEST_LOG_LEVEL", "debug")
 
 	s := load(t, config.Config{
@@ -205,8 +205,8 @@ func TestLoad_envMapDottedKeyBindsNestedTOML(t *testing.T) {
 		EnvMapFile: "testdata/env.yaml",
 	})
 
-	if got := s.String("myapp.log.level"); got != "debug" {
-		t.Errorf("myapp.log.level = %q, want debug (env)", got)
+	if got := s.String("example.log.level"); got != "debug" {
+		t.Errorf("example.log.level = %q, want debug (env)", got)
 	}
 }
 
@@ -228,8 +228,8 @@ func TestLoad_envFileLoads(t *testing.T) {
 		EnvFile:    envFile,
 	})
 
-	if got := s.String("myapp.log.level"); got != "warn" {
-		t.Errorf("myapp.log.level = %q, want warn (from .env)", got)
+	if got := s.String("example.log.level"); got != "warn" {
+		t.Errorf("example.log.level = %q, want warn (from .env)", got)
 	}
 }
 
@@ -275,7 +275,7 @@ func TestStore_unmarshalKey(t *testing.T) {
 	})
 
 	var got LogCfg
-	if err := s.Unmarshal("myapp.log", &got); err != nil {
+	if err := s.Unmarshal("example.log", &got); err != nil {
 		t.Fatalf("Unmarshal error = %v", err)
 	}
 
@@ -338,7 +338,7 @@ func TestStore_namespaces(t *testing.T) {
 	})
 
 	got := s.Namespaces()
-	want := []string{"database", "myapp", "server"}
+	want := []string{"database", "example", "server"}
 
 	if len(got) != len(want) {
 		t.Fatalf("Namespaces = %v, want %v", got, want)
@@ -355,7 +355,7 @@ func TestPriorityOrder(t *testing.T) {
 	userDir := t.TempDir()
 
 	if err := os.WriteFile(
-		filepath.Join(userDir, "myapp.toml"),
+		filepath.Join(userDir, "example.toml"),
 		[]byte("[log]\nlevel = \"warn\"\n"),
 		0o644,
 	); err != nil {
@@ -367,8 +367,8 @@ func TestPriorityOrder(t *testing.T) {
 		Sources:    []fs.FS{testFS},
 		SourcesDir: "testdata/defaults",
 	})
-	if got := s1.String("myapp.log.level"); got != "info" {
-		t.Errorf("defaults only: myapp.log.level = %q, want info", got)
+	if got := s1.String("example.log.level"); got != "info" {
+		t.Errorf("defaults only: example.log.level = %q, want info", got)
 	}
 
 	// + user → "warn".
@@ -377,8 +377,8 @@ func TestPriorityOrder(t *testing.T) {
 		SourcesDir: "testdata/defaults",
 		UserDir:    userDir,
 	})
-	if got := s2.String("myapp.log.level"); got != "warn" {
-		t.Errorf("with user file: myapp.log.level = %q, want warn", got)
+	if got := s2.String("example.log.level"); got != "warn" {
+		t.Errorf("with user file: example.log.level = %q, want warn", got)
 	}
 
 	// + env → "error".
@@ -390,7 +390,7 @@ func TestPriorityOrder(t *testing.T) {
 		EnvMap:     testFS,
 		EnvMapFile: "testdata/env.yaml",
 	})
-	if got := s3.String("myapp.log.level"); got != "error" {
-		t.Errorf("with env: myapp.log.level = %q, want error", got)
+	if got := s3.String("example.log.level"); got != "error" {
+		t.Errorf("with env: example.log.level = %q, want error", got)
 	}
 }
