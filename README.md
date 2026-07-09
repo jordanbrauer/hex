@@ -1,8 +1,4 @@
 <p align="center">
-    <em>An opinionated Go application framework.</em>
-</p>
-
-<p align="center">
     <a href="https://github.com/jordanbrauer/hex/actions/workflows/ci.yml"><img alt="ci" src="https://github.com/jordanbrauer/hex/actions/workflows/ci.yml/badge.svg"></a>
     <a href="https://pkg.go.dev/github.com/jordanbrauer/hex"><img alt="godoc" src="https://pkg.go.dev/badge/github.com/jordanbrauer/hex.svg"></a>
     <a href="LICENSE"><img alt="license" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
@@ -10,76 +6,67 @@
 
 # hex
 
-**hex** is a Go application framework for building CLIs, long-running
-services, and everything in between. It provides an IoC container, service
-providers with a proper lifecycle, a typed event bus, config layering,
-structured logging, database plumbing, an HTTP server, a view engine, an
-embedded Lua runtime, and a scaffolding CLI that stitches it all together
-into idiomatic, opinionated projects.
+**An opinionated Go application framework.**
 
-If you've enjoyed Laravel, Phoenix, or Hugo, hex will feel familiar. If
-you've mostly written Go, hex will feel like the missing "batteries" —
-the things every real service ends up needing that the standard library
-doesn't provide.
+hex gives you the boring, load-bearing pieces every real Go service ends
+up needing — an IoC container, service providers with a proper lifecycle,
+a typed event bus, layered config, structured logging, an HTTP server, a
+view engine, an embedded Lua runtime, a queue, a scheduler, a policy
+engine, feature flags, i18n, telemetry — all behind coherent interfaces
+that compose. It ships with a scaffolding CLI that generates full
+projects and individual pieces (providers, controllers, migrations,
+commands) following the same conventions the framework enforces at
+runtime.
 
-> **This repository is the framework**, analogous to
-> [`laravel/framework`](https://github.com/laravel/framework). The template
-> repository that consumer applications start from (analogous to
-> [`laravel/laravel`](https://github.com/laravel/laravel)) is scaffolded
-> by the `hex init` command in this repo.
+Write your business logic. Let hex handle the rest.
 
 ## Install
-
-The scaffolder installs like any other Go binary:
 
 ```sh
 go install github.com/jordanbrauer/hex/cmd/hex@latest
 ```
 
-Then in a new directory:
+Scaffold a new project:
 
 ```sh
-hex init myapp --db sqlite --web
-cd myapp
+hex init myproject --db sqlite --web
+cd myproject
 go run . serve
 ```
 
 Point a browser at <http://localhost:8080>.
 
-## What ships in the box
+## What's in the box
 
-| Concern | Package | Notes |
-|---|---|---|
-| App kernel | [`hex`](./) | Boot orchestration, container access, environment awareness |
-| DI | [`container`](./container) | Bind, Singleton, Make with type-safe generics |
-| Providers | [`provider`](./provider) | Register → Boot → Shutdown lifecycle |
-| Events | [`events`](./events) | Typed pub/sub bus |
-| Config | [`config`](./config) | Multi-source TOML + CUE + env.yaml, layered by priority |
-| Database | [`db`](./db) + [`db/sqlite`](./db/sqlite), [`db/postgres`](./db/postgres) | Driver-agnostic + migrations |
-| Logging | [`log`](./log) | `charmbracelet/log` wrapped with hex conventions |
-| CLI | [`cli`](./cli) | Cobra root + common flags + version command |
-| HTTP | [`web`](./web) + [`web/provider`](./web/provider) | `labstack/echo` + std middleware + health checks |
-| Views | [`view`](./view) + [`view/{md,jade}`](./view) | Go html/template + Markdown + Jade preprocessors |
-| Lua | [`lua`](./lua) + [`lua/{teal,fennel,repl}`](./lua) | Multi-language Lua runtime + REPL + type stubs |
-| Cache | [`cache`](./cache) + [`cache/memory`](./cache/memory) | Named backends, byte + generic surfaces |
-| Queue | [`queue`](./queue) + [`queue/{memory,sqlite,jobs}`](./queue) | Message queue + retry/DLQ jobs layer |
-| Cron | [`cron`](./cron) | Named jobs, panic recovery, structured logging |
-| Disk | [`disk`](./disk) + [`disk/local`](./disk/local) | Laravel-style multi-backend filesystem |
-| Pool | [`pool`](./pool) | Worker pool over `alitto/pond` |
-| Policy | [`policy`](./policy) | Authorisation via Casbin (ACL / RBAC / ABAC) |
-| I18n | [`i18n`](./i18n) | GNU gettext via `leonelquinteros/gotext` |
-| Feature flags | [`featureflag`](./featureflag) | `thomaspoignant/go-feature-flag` |
-| Telemetry | [`telemetry`](./telemetry) | OpenTelemetry tracer + meter + shutdown |
-| BDD | [`bdd`](./bdd) | Gherkin `.feature` via `go-bdd/gobdd` |
-| Web tests | [`webtest`](./webtest) + [`webtest/bdd`](./webtest/bdd) | supertest / RTL-style HTTP + DOM assertions |
-| TUI | [`tui`](./tui) | Renderer, markup, styles, components |
-| Utilities | [`clock`](./clock), [`id`](./id), [`errors`](./errors), [`hash`](./hash), [`retry`](./retry), [`ratelimit`](./ratelimit), [`httpx`](./httpx), [`validate`](./validate), [`env`](./env), [`build`](./build) | The small stuff every service needs |
-| Scaffolder | [`cmd/hex`](./cmd/hex) | `hex init`, `hex make:*`, `hex run`, `hex repl` |
+| Concern | Package |
+|---|---|
+| App kernel + bootstrap | [`hex`](./) |
+| IoC container | [`container`](./container) |
+| Service providers | [`provider`](./provider) |
+| Typed event bus | [`events`](./events) |
+| Layered config (TOML + CUE + env) | [`config`](./config) |
+| Database + migrations | [`db`](./db), [`db/sqlite`](./db/sqlite), [`db/postgres`](./db/postgres) |
+| Structured logging | [`log`](./log) |
+| Cobra CLI scaffolding | [`cli`](./cli) |
+| HTTP server + middleware | [`web`](./web) |
+| View engine (Go tmpl / Markdown / Jade) | [`view`](./view), [`view/md`](./view/md), [`view/jade`](./view/jade) |
+| Embedded Lua (Lua / Teal / Fennel) + REPL | [`lua`](./lua), [`lua/teal`](./lua/teal), [`lua/fennel`](./lua/fennel), [`lua/repl`](./lua/repl) |
+| Cache (memory, extensible) | [`cache`](./cache), [`cache/memory`](./cache/memory) |
+| Queue + jobs (memory, sqlite) | [`queue`](./queue), [`queue/memory`](./queue/memory), [`queue/sqlite`](./queue/sqlite), [`queue/jobs`](./queue/jobs) |
+| Cron scheduler | [`cron`](./cron) |
+| Multi-backend filesystem | [`disk`](./disk), [`disk/local`](./disk/local) |
+| Worker pool | [`pool`](./pool) |
+| Authorisation policy | [`policy`](./policy) |
+| Internationalisation | [`i18n`](./i18n) |
+| Feature flags | [`featureflag`](./featureflag) |
+| OpenTelemetry | [`telemetry`](./telemetry) |
+| BDD / Gherkin testing | [`bdd`](./bdd) |
+| Web-app testing (HTTP + DOM) | [`webtest`](./webtest), [`webtest/bdd`](./webtest/bdd) |
+| TUI primitives | [`tui`](./tui) |
+| Small utilities | [`clock`](./clock), [`id`](./id), [`errors`](./errors), [`hash`](./hash), [`retry`](./retry), [`ratelimit`](./ratelimit), [`httpx`](./httpx), [`validate`](./validate), [`env`](./env), [`build`](./build) |
+| Scaffolder CLI | [`cmd/hex`](./cmd/hex) |
 
-Every wrapped library is a deliberate choice, documented in the ADRs
-under [`docs/adr/`](./docs/adr).
-
-## A tour, in code
+## A quick tour
 
 **Bootstrap an app.**
 
@@ -94,8 +81,8 @@ import (
     hexcli "github.com/jordanbrauer/hex/cli"
     hexlog "github.com/jordanbrauer/hex/log"
 
-    "myapp/app"
-    "myapp/app/command"
+    "myproject/app"
+    "myproject/app/command"
 )
 
 func main() {
@@ -149,17 +136,16 @@ client.Get("/dashboard").
 
 Runnable example apps under [`examples/`](./examples):
 
-- [`examples/swapi`](./examples/swapi) — a Star Wars API demo scaffolded
-  via `hex init`, serving the classic SWAPI dataset with `hex/db` +
-  `hex/web` + `hex/view` + `hex/webtest`.
+- [`examples/swapi`](./examples/swapi) — a Star Wars API demo, scaffolded
+  via `hex init`, serving the classic SWAPI dataset out of a SQLite file.
 - [`examples/ai-lua`](./examples/ai-lua) — a minimal app that boots
   `hex/ai` + `hex/lua` and executes Lua scripts that call an LLM through
   the `agent` module.
 
 ## Documentation
 
-- [`docs/PLAN.md`](./docs/PLAN.md) — the framework's scope, package
-  roster, and phase plan.
+- [`docs/PLAN.md`](./docs/PLAN.md) — the framework's scope and package
+  roster.
 - [`docs/adr/`](./docs/adr) — architecture decisions, numbered and
   written in past tense. Read the ADR covering the area you're touching
   before changing it.
@@ -188,11 +174,46 @@ and the race-enabled test suite. CI mirrors that gate.
 
 ## Status
 
-hex is pre-1.0. The core packages (container, provider, events, config,
-db, log, cli, web, view, lua, queue, cache, cron) are stable in shape;
-minor breaking changes may still land ahead of a 1.0 tag. Watch the
-repository or subscribe to release notifications if you're building on
-top of it.
+hex is pre-1.0. The core packages are stable in shape; minor breaking
+changes may still land ahead of a 1.0 tag. Watch the repository or
+subscribe to release notifications if you're building on top of it.
+
+## Inspiration & references
+
+hex stands on the shoulders of many prior frameworks and libraries.
+Direct influences:
+
+- **[Laravel](https://laravel.com)** — the service container, service
+  provider lifecycle, artisan-style scaffolder, and general "batteries
+  included with taste" philosophy.
+- **[Phoenix](https://phoenixframework.org)** — the runtime environment
+  as a first-class concept, the layered supervisor tree feel of the
+  provider registry, and channel-flavoured event bus semantics.
+- **[Ruby on Rails](https://rubyonrails.org)** — convention over
+  configuration, generators, and the "one canonical place for each
+  concern" project layout.
+- **[Hugo](https://gohugo.io)** — proof that Go can carry an opinionated
+  framework with a great CLI.
+
+Notable Go libraries hex builds on:
+
+- [`labstack/echo`](https://github.com/labstack/echo) — HTTP routing and
+  middleware.
+- [`spf13/cobra`](https://github.com/spf13/cobra) and
+  [`spf13/viper`](https://github.com/spf13/viper) — CLI and config.
+- [`charmbracelet/log`](https://github.com/charmbracelet/log) and the
+  wider [charm](https://charm.sh) TUI ecosystem.
+- [`yuin/gopher-lua`](https://github.com/yuin/gopher-lua) — the embedded
+  Lua VM, plus [Teal](https://github.com/teal-language/tl) and
+  [Fennel](https://fennel-lang.org) on top of it.
+- [`casbin/casbin`](https://github.com/casbin/casbin) — the authorisation
+  model.
+- [`golang-migrate/migrate`](https://github.com/golang-migrate/migrate)
+  — database migrations.
+- [`cuelang.org/go`](https://cuelang.org) — config schema validation.
+
+Full list of dependencies and the ADR that motivated each wrapping
+decision is in [`docs/adr/`](./docs/adr).
 
 ## License
 
