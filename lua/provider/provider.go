@@ -18,12 +18,29 @@ package provider
 
 import (
 	"context"
+	"embed"
+	"io/fs"
 
 	hexlua "github.com/jordanbrauer/hex/lua"
 
 	"github.com/jordanbrauer/hex/container"
 	"github.com/jordanbrauer/hex/provider"
 )
+
+//go:embed config
+var configFS embed.FS
+
+// Configs returns the embedded default TOML + CUE files this provider
+// contributes to hex/config. Add it to hex/config.Provider.Sources to
+// pick up the "repl" namespace (mode = "teal" | "lua").
+func Configs() fs.FS {
+	sub, err := fs.Sub(configFS, "config")
+	if err != nil {
+		panic("lua/provider: embedded config subdir missing: " + err.Error())
+	}
+
+	return sub
+}
 
 // Provider wires a shared *hex/lua.Environment into the container.
 // Other providers register modules/globals against it in their own
