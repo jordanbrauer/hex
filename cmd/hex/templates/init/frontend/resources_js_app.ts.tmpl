@@ -1,17 +1,22 @@
-// Application-owned TypeScript. Alpine and HTMX are imported so the
-// build has type information; runtime script tags in the layout
-// serve the minified vendor files.
+// Vite-bundled TypeScript entry. Alpine + htmx are pulled from
+// node_modules; vite tree-shakes what isn't used. The layout only
+// references /js/app.js — no /vendor/ paths in TS mode.
 
-import htmx from "htmx.org";
+import "htmx.org";
 import Alpine from "alpinejs";
 
-// Expose Alpine so components declared with x-data can bind to it.
-(window as unknown as { Alpine: typeof Alpine }).Alpine = Alpine;
+declare global {
+    interface Window {
+        Alpine: typeof Alpine;
+    }
+}
+
+window.Alpine = Alpine;
 Alpine.start();
 
 document.body.addEventListener("htmx:beforeRequest", (event: Event) => {
-    const detail = (event as CustomEvent).detail as { requestConfig?: { path?: string } };
-    console.debug("htmx →", detail.requestConfig?.path);
+    const detail = (event as CustomEvent).detail as {
+        requestConfig?: { path?: string };
+    };
+    console.debug("htmx \u2192", detail.requestConfig?.path);
 });
-
-export { htmx, Alpine };

@@ -1,6 +1,14 @@
 @import "tailwindcss";
 
-/* Custom component classes go here. Tailwind v4 uses CSS-first
- * configuration; declare a theme in @theme { ... } or extend
- * utilities via the plugin API.
+/* Tailwind v4 CSS-first configuration. Declare template + JS source
+ * paths so the utility scanner picks up class references. Add
+ * additional @source lines as your view/js layout grows.
  */
+@source "../../web/views/**/*.gotmpl";
+{{- if .FrontendTS }}
+@source "../../resources/js/**/*.{ts,tsx}";
+{{- else }}
+@source "../../public/js/**/*.js";
+{{- end }}
+
+/* Add custom component classes or a @theme { ... } block here. */
