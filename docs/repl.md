@@ -44,6 +44,34 @@ The Lua environment is shared, so globals set in one mode are
 visible from the other (subject to Teal's chunk-local locals
 caveat). Framework modules stay registered in both.
 
+### Mode-crossing quirks (feature, not bug)
+
+Teal's type table and Lua's runtime `_G` are two separate
+structures backed by the same environment. Switching modes
+lets you cross freely between them — including in ways that
+look like type violations:
+
+```
+myapp(teal)> global foo: string = "1"
+myapp(teal)> l                            ← switch to lua
+myapp(lua)>  foo = 20                     ← Lua doesn't check; _G.foo = 20
+myapp(lua)>  ⌫                            ← back to teal
+myapp(teal)> print(foo)
+20                                        ← sees the mutated runtime value
+myapp(teal)> foo = 21
+error: type error: in assignment: got integer, expected string
+                                          ← Teal still thinks foo is a string
+```
+
+This is the same tradeoff TypeScript makes with plain JavaScript:
+the type-checked language enforces what it was told, the untyped
+language can put whatever it wants in the underlying storage.
+
+If you deliberately want to widen a Teal-declared type, redeclare
+it in Teal (`global foo: integer = 21`). Or stay in Lua mode
+for free-form exploration and switch back to Teal when you want
+the safety net.
+
 ## Built-in modules
 
 Wired automatically — no `require()` needed, they're pre-declared as
