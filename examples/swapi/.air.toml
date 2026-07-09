@@ -1,0 +1,30 @@
+# Air config for swapi. `just dev` invokes air to rebuild + restart
+# the Go binary on file changes. Runs alongside frontend watchers in
+# separate processes when --frontend is enabled.
+#
+# Install air:  go install github.com/air-verse/air@latest
+
+root = "."
+tmp_dir = "tmp"
+
+[build]
+cmd = "go build -o ./tmp/main ."
+entrypoint = "./tmp/main"
+args_bin = ["serve"]
+include_ext = ["go", "gotmpl", "toml", "yaml", "env", "sql", "cue"]
+exclude_dir = ["bin", "data", "tmp", "public", "node_modules", "resources", ".git"]
+exclude_regex = ["_test\\.go$", "\\.!"]
+kill_delay = "500ms"
+stop_on_error = true
+
+[log]
+time = false
+main_only = true
+silent = false
+
+[misc]
+clean_on_exit = true
+
+[screen]
+clear_on_rebuild = false
+keep_scroll = true

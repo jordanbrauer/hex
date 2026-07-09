@@ -1,0 +1,21 @@
+/bin/
+/data/
+/tmp/
+*.test
+*.out
+coverage.*
+.DS_Store
+.env
+.env.local
+
+# Node
+node_modules/
+pnpm-debug.log
+npm-debug.log
+yarn-error.log
+
+# Frontend build output — regenerate via `pnpm build`
+public/css/app.css
+public/js/app.js
+public/js/manifest.json
+public/vendor/

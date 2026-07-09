@@ -1,0 +1,10 @@
+address = ":8080"
+read_timeout = "10s"
+write_timeout = "10s"
+idle_timeout = "60s"
+health_path = "/healthz"
+ready_path = "/readyz"
+cors = false
+disable_request_id = false
+disable_recover = false
+disable_logger = false

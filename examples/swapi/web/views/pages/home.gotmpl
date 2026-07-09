@@ -1,0 +1,18 @@
+{{ define "pages/home" }}
+{{ template "layouts/head" . }}
+<main>
+    <h2>A long time ago in a galaxy far, far away…</h2>
+    <p>An <code>hex</code> app rendering the classic
+        <a href="https://swapi.dev">SWAPI</a> dataset out of a 316 KB SQLite file.</p>
+
+    <div class="counts">
+        <a href="/films"><div class="n">{{ .Counts.Films }}</div><div class="label">Films</div></a>
+        <a href="/people"><div class="n">{{ .Counts.People }}</div><div class="label">People</div></a>
+        <a href="/planets"><div class="n">{{ .Counts.Planets }}</div><div class="label">Planets</div></a>
+        <a href="/species"><div class="n">{{ .Counts.Species }}</div><div class="label">Species</div></a>
+        <a href="/starships"><div class="n">{{ .Counts.Starships }}</div><div class="label">Starships</div></a>
+        <a href="/vehicles"><div class="n">{{ .Counts.Vehicles }}</div><div class="label">Vehicles</div></a>
+    </div>
+</main>
+{{ template "layouts/foot" . }}
+{{ end }}

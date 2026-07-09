@@ -1,0 +1,33 @@
+package main
+
+import (
+	"context"
+	"os"
+
+	"github.com/jordanbrauer/hex"
+	hexcli "github.com/jordanbrauer/hex/cli"
+	hexlog "github.com/jordanbrauer/hex/log"
+
+	"github.com/jordanbrauer/hex/examples/swapi/app"
+	"github.com/jordanbrauer/hex/examples/swapi/app/command"
+)
+
+func main() {
+	hexlog.Init()
+
+	kernel := hex.New()
+
+	if err := app.Boot(kernel); err != nil {
+		hexlog.Fatal("register providers", "error", err)
+	}
+
+	ctx := context.Background()
+
+	if err := kernel.Bootstrap(ctx); err != nil {
+		hexlog.Fatal("bootstrap", "error", err)
+	}
+
+	defer func() { _ = kernel.Shutdown(ctx) }()
+
+	os.Exit(hexcli.Execute(command.Root(kernel)))
+}
