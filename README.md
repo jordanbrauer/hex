@@ -191,6 +191,9 @@ Direct influences:
   concern" project layout.
 - **[Hugo](https://gohugo.io)** — proof that Go can carry an opinionated
   framework with a great CLI.
+- **[Algernon](https://algernon.roboticoverlords.org)** — a Go web server
+  that embeds gopher-lua alongside markdown and templates, and did the
+  gopher-lua ↔ Go-modules dance long before hex.
 
 Notable Go libraries hex builds on:
 
