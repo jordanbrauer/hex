@@ -736,9 +736,17 @@ func trimTraceback(msg string) string {
 	return strings.TrimSpace(msg)
 }
 
-// formatValue renders a Lua value for display in the REPL. Strings
-// are shown unquoted (Ruby-style); everything else uses gopher-lua's
-// default String() rendering.
+// formatValue renders a Lua value for display in the REPL.
+//
+//   - strings render unquoted (Ruby-style)
+//   - tables render as a bordered grid via tabulate() — array-of-
+//     records becomes a real table with all keys as columns; other
+//     shapes fall back to key/value or single-column layouts
+//   - everything else uses gopher-lua's default String() rendering
+//
+// The table path replaces gopher-lua's default "table: 0x…" pointer
+// output, which is useless for interactive inspection of query
+// results.
 func formatValue(v lua.LValue) string {
 	if v == nil {
 		return "nil"
@@ -746,6 +754,10 @@ func formatValue(v lua.LValue) string {
 
 	if s, ok := v.(lua.LString); ok {
 		return string(s)
+	}
+
+	if t, ok := v.(*lua.LTable); ok {
+		return tabulate(t)
 	}
 
 	return v.String()
