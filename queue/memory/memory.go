@@ -81,13 +81,21 @@ type delayedMsg struct {
 }
 
 type sub struct {
-	id       uint64
-	topic    *topic
-	handler  queue.Handler
-	ctx      context.Context
-	cancel   context.CancelFunc
-	q        *Queue
-	done     chan struct{} // closed when the goroutine exits
+	id      uint64
+	topic   *topic
+	handler queue.Handler
+	ctx     context.Context
+	cancel  context.CancelFunc
+	q       *Queue
+	done    chan struct{} // closed when the goroutine exits
+	// dispatcher hands messages to this sub here. Buffered with cap 1
+	// so the round-robin dispatcher can queue a message on a sub while
+	// that sub is still processing its previous message — without the
+	// buffer, only subs that happen to be at `<-msgCh` at the moment
+	// dispatchReady iterates receive anything, and fast handlers like
+	// `atomic.AddInt64` can produce total shutouts of other subs on
+	// single-CPU CI runners.
+	msgCh    chan *queue.Message
 	inFlight sync.WaitGroup
 }
 
@@ -105,8 +113,10 @@ func (q *Queue) getOrCreateTopic(name string) *topic {
 	}
 	q.topics[name] = t
 
-	// Kick off a scheduler for this topic to drain the delayed queue.
+	// Kick off a scheduler for this topic to drain the delayed queue,
+	// and a dispatcher to hand ready messages to subscribers fairly.
 	go q.scheduler(t)
+	go q.dispatcher(t)
 
 	return t
 }
@@ -123,6 +133,61 @@ func (q *Queue) scheduler(t *topic) {
 		case <-ticker.C:
 			t.promoteDue()
 		}
+	}
+}
+
+// dispatcher is the single goroutine responsible for handing ready
+// messages to subscribers in round-robin order. Using one dispatcher
+// per topic (instead of letting each sub's goroutine race to pull off
+// a shared FIFO) guarantees a fair split across competing consumers —
+// without it, OS scheduling can let one sub's goroutine claim many
+// messages in a row before another ever runs, especially on CI
+// runners with few CPUs.
+func (q *Queue) dispatcher(t *topic) {
+	for {
+		select {
+		case <-q.ctx.Done():
+			return
+		case <-t.notify:
+			t.dispatchReady()
+		}
+	}
+}
+
+// dispatchReady hands off as many ready messages as current
+// subscriber availability allows, advancing the round-robin cursor
+// one step per successful hand-off. Stops (without error) once no
+// subscriber can currently accept a message; the next wake() call
+// (triggered by a sub finishing its current message, a new publish,
+// or a promoted delayed message) resumes dispatch.
+func (t *topic) dispatchReady() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	for len(t.ready) > 0 && len(t.subs) > 0 {
+		n := len(t.subs)
+		delivered := false
+
+		for i := 0; i < n; i++ {
+			idx := (t.nextIdx + i) % n
+			s := t.subs[idx]
+
+			select {
+			case s.msgCh <- t.ready[0]:
+				t.nextIdx = (idx + 1) % n
+				delivered = true
+			default:
+				continue
+			}
+
+			break
+		}
+
+		if !delivered {
+			return
+		}
+
+		t.ready = t.ready[1:]
 	}
 }
 
@@ -256,6 +321,7 @@ func (q *Queue) Subscribe(ctx context.Context, topicName string, handler queue.H
 		cancel:  cancel,
 		q:       q,
 		done:    make(chan struct{}),
+		msgCh:   make(chan *queue.Message, 1),
 	}
 
 	t.mu.Lock()
@@ -272,48 +338,31 @@ func (q *Queue) Subscribe(ctx context.Context, topicName string, handler queue.H
 
 // -- delivery loop --------------------------------------------------------
 
-// run pulls messages off the topic and invokes the handler. Messages
-// that error are requeued (bounded by MaxRetries) or dropped.
+// run receives messages the topic's dispatcher hands to this sub (in
+// round-robin turn with any other subs on the same topic) and invokes
+// the handler. Messages that error are requeued (bounded by
+// MaxRetries) or dropped.
 func (s *sub) run() {
 	defer close(s.done)
 
 	for {
-		msg := s.claim()
-		if msg == nil {
-			select {
-			case <-s.ctx.Done():
+		select {
+		case <-s.ctx.Done():
+			return
+		case msg := <-s.msgCh:
+			s.inFlight.Add(1)
+			s.deliver(msg)
+			s.inFlight.Done()
+
+			// We may now be able to accept another message — nudge the
+			// dispatcher in case there's a backlog waiting on us.
+			s.topic.wake()
+
+			if s.ctx.Err() != nil {
 				return
-			case <-s.topic.notify:
-				continue
-			case <-time.After(s.q.opts.PollInterval):
-				continue
 			}
 		}
-
-		s.inFlight.Add(1)
-		s.deliver(msg)
-		s.inFlight.Done()
-
-		if s.ctx.Err() != nil {
-			return
-		}
 	}
-}
-
-// claim removes one message from the ready FIFO if available. Nil means
-// no message was available.
-func (s *sub) claim() *queue.Message {
-	s.topic.mu.Lock()
-	defer s.topic.mu.Unlock()
-
-	if len(s.topic.ready) == 0 {
-		return nil
-	}
-
-	msg := s.topic.ready[0]
-	s.topic.ready = s.topic.ready[1:]
-
-	return msg
 }
 
 // deliver runs the handler with panic recovery. On error/panic the
