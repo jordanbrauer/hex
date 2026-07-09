@@ -25,6 +25,7 @@ func Boot(kernel *hex.App) error {
 		provider.Lua(),
 {{- if .HasDatabase }}
 		provider.Database(),
+		provider.LuaDB(),
 {{- end }}
 {{- if .Cache }}
 		provider.Cache(),
