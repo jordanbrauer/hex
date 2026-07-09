@@ -20,18 +20,29 @@ Write your business logic. Let hex handle the rest.
 
 ## Install
 
-**Homebrew (macOS + Linux, recommended):**
+hex has two install paths depending on what you want.
+
+**The `hex` CLI scaffolder** — for creating new projects and generating
+code:
 
 ```sh
+# Homebrew (macOS + Linux, recommended):
 brew tap jordanbrauer/hex https://github.com/jordanbrauer/hex
 brew install jordanbrauer/hex/hex
-```
 
-**Go toolchain:**
-
-```sh
+# Or via the Go toolchain:
 go install github.com/jordanbrauer/hex/cmd/hex@latest
 ```
+
+**The framework packages** — imported by your app's `go.mod`:
+
+```sh
+go get github.com/jordanbrauer/hex@latest
+```
+
+You almost never do this by hand — `hex init` generates a `go.mod` with
+the right require line, and `hex make:*` adds any subpackages your
+choices pull in.
 
 Scaffold a new project:
 
