@@ -1,0 +1,2 @@
+[pool]
+max_open = 42

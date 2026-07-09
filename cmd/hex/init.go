@@ -607,7 +607,6 @@ func publishFrameworkConfigs(g *generator, cfg initConfig) error {
 func databaseFiles(cfg initConfig) []fileSpec {
 	return []fileSpec{
 		{"templates/init/database_provider.go.tmpl", filepath.Join(cfg.Directory, "app", "provider", "database.go")},
-		{"templates/init/provider_lua_db.go.tmpl", filepath.Join(cfg.Directory, "app", "provider", "lua_db.go")},
 		{"templates/init/database.toml.tmpl", filepath.Join(cfg.Directory, "config", "database.toml")},
 		{"templates/init/db_migrations.go.tmpl", filepath.Join(cfg.Directory, "database", "migrations.go")},
 		{"templates/init/initial_migration.up.sql.tmpl", filepath.Join(cfg.Directory, "database", "migrations", "00000000000000_init.up.sql")},

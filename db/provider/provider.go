@@ -17,10 +17,14 @@ import (
 	"fmt"
 	"io/fs"
 
+	glua "github.com/yuin/gopher-lua"
+
 	"github.com/jordanbrauer/hex/config"
 	"github.com/jordanbrauer/hex/container"
 	hexdb "github.com/jordanbrauer/hex/db"
+	dblua "github.com/jordanbrauer/hex/db/lua"
 	hexlog "github.com/jordanbrauer/hex/log"
+	hexlua "github.com/jordanbrauer/hex/lua"
 	"github.com/jordanbrauer/hex/provider"
 )
 
@@ -69,7 +73,11 @@ type Provider struct {
 }
 
 // Register binds the *sql.DB into the container lazily — the actual
-// connection open happens in Boot so context is available.
+// connection open happens in Boot so context is available. When a
+// shared hex/lua.Environment is bound in the container (i.e.
+// hex/lua/provider is registered), this provider also installs the
+// 'db' Lua module against it so scripts and the REPL can query the
+// live connection.
 func (p *Provider) Register(app provider.Application) error {
 	binding := p.Binding
 	if binding == "" {
@@ -84,7 +92,39 @@ func (p *Provider) Register(app provider.Application) error {
 		return p.db, nil
 	})
 
+	p.installLuaModule(app, binding)
+
 	return nil
+}
+
+// installLuaModule preloads the 'db' Lua module against the shared
+// *hex/lua.Environment if one is bound in the container. Silently
+// no-ops when Lua isn't wired — hex/db is usable without Lua.
+//
+// Resolution of the *sql.DB is deferred to the first require("db")
+// so we don't poison the singleton with the pre-Boot error (pi-7ag).
+func (p *Provider) installLuaModule(app provider.Application, dbBinding string) {
+	env, err := container.Make[*hexlua.Environment](app, "lua")
+	if err != nil || env == nil {
+		return
+	}
+
+	bindings := &dblua.Bindings{}
+
+	env.PreloadModule("db", func(L *glua.LState) int {
+		if bindings.DB == nil {
+			db, err := container.Make[*sql.DB](app, dbBinding)
+			if err != nil {
+				L.RaiseError("db/provider: resolve %q: %v", dbBinding, err)
+
+				return 0
+			}
+
+			bindings.DB = db
+		}
+
+		return bindings.Loader(L)
+	})
 }
 
 // Boot opens the connection, applies pragmas, and runs the Migrator.

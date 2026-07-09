@@ -1,10 +1,11 @@
 // Package lua exposes hex/db to Lua scripts via a gopher-lua module
 // named "db".
 //
-// The module is installed by hex/db/lua/provider, which resolves the
-// shared *hex/lua.Environment from the container (bound by
-// hex/lua/provider) and the *sql.DB (bound by hex/db/provider) and
-// calls env.PreloadModule("db", ...).
+// The module is installed by hex/db/provider whenever a shared
+// *hex/lua.Environment is bound in the container (i.e.
+// hex/lua/provider is also registered). No separate bridge provider
+// is needed — the DB provider owns both the *sql.DB binding and the
+// Lua module registration.
 //
 // Consumer scripts (including the REPL) can then:
 //
