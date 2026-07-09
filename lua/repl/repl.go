@@ -22,10 +22,12 @@ import (
 	"sort"
 	"strings"
 
+	tea "github.com/charmbracelet/bubbletea"
 	lua "github.com/yuin/gopher-lua"
 
 	hexlua "github.com/jordanbrauer/hex/lua"
 	"github.com/jordanbrauer/hex/lua/teal"
+	tuirepl "github.com/jordanbrauer/hex/tui/components/repl"
 )
 
 // Mode selects the language the REPL evaluates.
@@ -84,6 +86,19 @@ type Options struct {
 	// pass the container's shared environment so registered modules
 	// are available.
 	Env *hexlua.Environment
+
+	// Interactive selects between the two REPL loops:
+	//
+	//   false (default) — bufio.Scanner over In/Out/ErrOut. No
+	//     terminal features; suitable for pipes, tests, and any
+	//     non-TTY caller.
+	//
+	//   true — Bubble Tea program via hex/tui/components/repl,
+	//     giving arrow-key editing, command history, styled
+	//     output, and a scrollable viewport. Requires a real TTY;
+	//     the caller is responsible for detecting one (typically
+	//     via golang.org/x/term or mattn/go-isatty on os.Stdin).
+	Interactive bool
 }
 
 // Run executes the read-eval-print loop with the given options and
@@ -152,19 +167,38 @@ func Run(opts Options) error {
 		tealSession = session
 	}
 
-	fmt.Fprintf(opts.Out, "%s repl — %s mode. Ctrl+D or \"exit\" to quit.\n", opts.AppName, opts.Mode)
+	bannerHeader := fmt.Sprintf("%s repl — %s mode. Ctrl+D or \"exit\" to quit.", opts.AppName, opts.Mode)
+
+	bannerLines := []string{bannerHeader}
 
 	if opts.Banner != "" {
-		fmt.Fprintln(opts.Out, opts.Banner)
+		bannerLines = append(bannerLines, opts.Banner)
 	}
 
 	if isTeal {
-		fmt.Fprintln(opts.Out, "note: framework modules (db, cache, config, log, env, events, queue) are typed globals.")
-		fmt.Fprintln(opts.Out, "      Your own vars need `global x: T = v` to persist across lines (locals die with the chunk).")
-		fmt.Fprintln(opts.Out, "      Pass `--mode lua` for looser Lua semantics.")
+		bannerLines = append(bannerLines,
+			"note: framework modules (db, cache, config, log, env, events, queue) are typed globals.",
+			"      Your own vars need `global x: T = v` to persist across lines (locals die with the chunk).",
+			"      Pass `--mode lua` for looser Lua semantics.",
+		)
 	}
 
 	prompt := opts.AppName + "(" + opts.Mode.String() + ")> "
+
+	if opts.Interactive {
+		return runInteractive(env, tealSession, isTeal, prompt, strings.Join(bannerLines, "\n"))
+	}
+
+	return runScripted(env, tealSession, isTeal, opts, prompt, bannerLines)
+}
+
+// runScripted is the plain-text loop used for pipes, tests, and any
+// non-TTY caller. Reads from opts.In, writes to opts.Out/ErrOut,
+// no terminal features.
+func runScripted(env *hexlua.Environment, session *teal.Session, isTeal bool, opts Options, prompt string, bannerLines []string) error {
+	for _, line := range bannerLines {
+		fmt.Fprintln(opts.Out, line)
+	}
 
 	scanner := bufio.NewScanner(opts.In)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
@@ -173,7 +207,6 @@ func Run(opts Options) error {
 		fmt.Fprint(opts.Out, prompt)
 
 		if !scanner.Scan() {
-			// EOF or read error. Distinguish by scanner.Err() == nil.
 			if err := scanner.Err(); err != nil {
 				return err
 			}
@@ -193,11 +226,10 @@ func Run(opts Options) error {
 			continue
 		}
 
-		if err := evalLine(env, opts.Out, line, isTeal, tealSession); err != nil {
+		if err := evalLine(env, opts.Out, line, isTeal, session); err != nil {
 			msg := trimTraceback(err.Error())
 			fmt.Fprintln(opts.ErrOut, "error:", msg)
 
-			// Teal-specific hints for common confusions.
 			if isTeal {
 				hint := tealErrorHint(msg)
 				if hint != "" {
@@ -206,6 +238,50 @@ func Run(opts Options) error {
 			}
 		}
 	}
+}
+
+// runInteractive drives the REPL through hex/tui/components/repl,
+// a Bubble Tea component with arrow-key editing, history, and
+// styled output. Requires a TTY on stdin.
+func runInteractive(env *hexlua.Environment, session *teal.Session, isTeal bool, prompt, banner string) error {
+	// evaluator is a synchronous closure the TUI calls for each
+	// submitted line. It captures env + session; return values
+	// feed the viewport.
+	evaluator := func(line string) tuirepl.Result {
+		if isExitDirective(line) {
+			return tuirepl.Result{Exit: true}
+		}
+
+		var outBuf strings.Builder
+
+		if err := evalLine(env, &outBuf, line, isTeal, session); err != nil {
+			msg := trimTraceback(err.Error())
+			errText := "error: " + msg
+
+			if isTeal {
+				if hint := tealErrorHint(msg); hint != "" {
+					errText += "\n" + hint
+				}
+			}
+
+			return tuirepl.Result{Output: strings.TrimRight(outBuf.String(), "\n"), Err: errText}
+		}
+
+		return tuirepl.Result{Output: strings.TrimRight(outBuf.String(), "\n")}
+	}
+
+	model := tuirepl.New(tuirepl.Options{
+		Prompt:       prompt,
+		Banner:       banner,
+		Evaluator:    evaluator,
+		HistoryLimit: 1000,
+	})
+
+	prog := tea.NewProgram(model, tea.WithAltScreen())
+
+	_, err := prog.Run()
+
+	return err
 }
 
 // tealErrorHint maps a Teal error message to a friendly one-line hint,
