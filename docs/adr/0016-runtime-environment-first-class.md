@@ -38,19 +38,26 @@ const (
 
 `hex.New(hex.WithEnvironment(env.X))` sets it explicitly; auto-detect fills in when not set. The `provider.Application` interface gains an `Environment() env.Environment` method so any provider can consult it during Register/Boot without reaching around.
 
-### 3. Config layering per environment
+### 3. Env-specific overrides via `.env.<env>`
 
-`hex/config` grew a `Config.Environment` field. When set, files named `<namespace>.<env>.toml` overlay their base `<namespace>.toml` counterpart in the same source. Overlays merge over the base per namespace; sources still merge in registration order (framework → app → …).
-
-Example directory:
+`hex/config` grew a `Config.Environment` field. When set (and `EnvFile` is populated), Load also attempts to load `<EnvFile>.<Environment>` before the base `.env`. godotenv's no-overwrite semantics give the desired precedence:
 
 ```
+OS env  >  .env.<env>  >  .env  >  base TOML in config/
+```
+
+Env bindings declared in `env.yaml` map config keys to env-var names, and CUE schema validation runs against the merged view including env-bound values, so bad env overrides fail loudly at Load time just like bad TOML values would.
+
+Example layout:
+
+```
+.env                 # local defaults, typically gitignored
+.env.test            # committed; test overrides (DSN=:memory:, small pools)
+.env.production      # committed; production overrides (postgres DSN, tuned pool)
 config/
-├── database.toml               # base defaults
-├── database.test.toml          # dsn=":memory:", 1 conn
-├── database.production.toml    # postgres dsn, tuned pool
-├── cache.toml                  # driver="memory" size=100
-└── cache.test.toml             # size=5 for hermetic tests
+├── env.yaml         # binding: config.key -> ENV_VAR
+├── database.toml    # dev defaults
+└── cache.toml       # dev defaults
 ```
 
 ## Alternatives considered
@@ -58,10 +65,12 @@ config/
 1. **Consumer-side `testutil.NewTestApp(t)` only** — solves the immediate problem but doesn't scale beyond tests, doesn't help third-party providers, and the trap remains silent.
 2. **Env-guarded refusal in db/provider** — refuse to open a real DB path unless `HEX_ALLOW_REAL_DB=1`. Rejected because it puts the safety mechanism in one provider instead of at the framework level.
 3. **Environment as a config value only** (no first-class type) — a namespaced key like `hex.env = "test"`. Rejected because it's discovered too late (after config loads), and providers would still need helpers to read + parse it. Not worth the indirection.
-4. **Subdirectory-based overlays** (`config/environments/test/database.toml`) — considered and preferred by some frameworks. Rejected here because:
-   - Sub-extension (`database.test.toml`) is a single-file lookup with no nesting.
-   - `//go:embed *.toml` picks them up automatically without new glob patterns.
-   - Aligns with the naming convention already used for CUE (`database.cue`) and the app's own schema stub (`schema.cue`).
+4. **TOML overlay files** (`config/database.test.toml` overlays `config/database.toml`) — initially implemented in commit `00ee1a2` and reverted in favour of `.env.<env>`. Rejected because:
+   - Introduced a second override mechanism alongside env vars, doubling the surface consumers had to learn.
+   - env.yaml already exists as an explicit contract of overridable keys; `.env.<env>` reuses it verbatim.
+   - `.env.<env>` matches the ecosystem pattern (Node/Rails/Laravel) instead of a hex-specific TOML sub-extension.
+   - CUE validation covers env-bound values equally well (viper's `AllSettings` evaluates env bindings at Load, so bad env values fail schema validation same as bad TOML values).
+5. **Subdirectory-based overlays** (`config/environments/test/database.toml`) — considered and dropped alongside TOML overlays for the same reasons.
 5. **Include a `Staging` constant** — rejected as unnecessary. Staging is where you deploy production code with a `deploy.tier=staging` config value.
 
 ## Consequences
