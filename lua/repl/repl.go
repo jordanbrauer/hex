@@ -277,7 +277,11 @@ func runInteractive(env *hexlua.Environment, session *teal.Session, isTeal bool,
 		HistoryLimit: 1000,
 	})
 
-	prog := tea.NewProgram(model, tea.WithAltScreen())
+	// Inline mode (no alt-screen): the model only renders the input
+	// line via View, and pushes everything else into the terminal's
+	// scrollback via tea.Println. This keeps native scroll, mouse
+	// selection, and shell history working without hijacking them.
+	prog := tea.NewProgram(model)
 
 	_, err := prog.Run()
 
