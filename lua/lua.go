@@ -35,6 +35,7 @@ package lua
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime/debug"
@@ -59,6 +60,12 @@ type Environment struct {
 	// SetType; read by hex/lua/teal.Session on session init so
 	// require("name") in Teal source finds the module's type signature.
 	types map[string]string
+
+	// stdout is where the overridden Lua `print` writes. Defaults to
+	// os.Stdout. The REPL redirects this per-eval so print output
+	// flows through Result.Output instead of clobbering the Bubble
+	// Tea render.
+	stdout io.Writer
 
 	closed   bool
 	tealOnce sync.Once
@@ -135,8 +142,51 @@ func New(opts ...Option) *Environment {
 		}
 	}
 
-	return &Environment{L: L}
+	e := &Environment{L: L, stdout: os.Stdout}
+
+	// Only override print if stdlib is loaded — WithoutStandardLibraries
+	// callers expect a locked-down state where print isn't available.
+	if !cfg.skipOpenAll {
+		e.installPrint()
+	}
+
+	return e
 }
+
+// installPrint replaces gopher-lua's default print (hardcoded to
+// fmt.Print / os.Stdout) with one that writes to e.stdout, so
+// callers can redirect script output at any time via SetStdout.
+func (e *Environment) installPrint() {
+	e.L.SetGlobal("print", e.L.NewFunction(func(L *lua.LState) int {
+		top := L.GetTop()
+		for i := 1; i <= top; i++ {
+			fmt.Fprint(e.stdout, L.ToStringMeta(L.Get(i)).String())
+
+			if i != top {
+				fmt.Fprint(e.stdout, "\t")
+			}
+		}
+
+		fmt.Fprintln(e.stdout, "")
+
+		return 0
+	}))
+}
+
+// SetStdout redirects the Lua `print` function's output. The change is
+// live: subsequent print() calls write to w. Nil restores os.Stdout.
+func (e *Environment) SetStdout(w io.Writer) {
+	if w == nil {
+		e.stdout = os.Stdout
+
+		return
+	}
+
+	e.stdout = w
+}
+
+// Stdout returns the current writer that print() flushes to.
+func (e *Environment) Stdout() io.Writer { return e.stdout }
 
 // Close releases the Lua state's resources. Safe to call more than once.
 // After Close, the Environment must not be used.
