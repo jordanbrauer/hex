@@ -49,6 +49,10 @@ const (
 	// type-checker; implicit globals allowed. Prefer for quick
 	// prototyping when Teal's strictness gets in the way.
 	ModeLua
+
+	// ModeFennel evaluates input as Fennel — the Lisp-flavoured Lua
+	// dialect. Balanced parens, macros, no static type layer.
+	ModeFennel
 )
 
 // String returns the human-readable mode name used in the banner and
@@ -57,8 +61,22 @@ func (m Mode) String() string {
 	switch m {
 	case ModeLua:
 		return "lua"
+	case ModeFennel:
+		return "fennel"
 	default:
 		return "teal"
+	}
+}
+
+// toLanguage returns the hex/lua.Language equivalent of a REPL Mode.
+func (m Mode) toLanguage() hexlua.Language {
+	switch m {
+	case ModeLua:
+		return hexlua.Lua
+	case ModeFennel:
+		return hexlua.Fennel
+	default:
+		return hexlua.Teal
 	}
 }
 
@@ -126,14 +144,20 @@ func Run(opts Options) error {
 		opts.AppName = "hex"
 	}
 
-	// For Teal mode: initialise a persistent Teal env so declarations
-	// on one line remain visible on subsequent lines. Non-REPL
-	// contexts (hex run script.tl) intentionally get isolated chunk
-	// semantics; the REPL is the exception.
+	// For Teal: initialise a persistent Teal env so declarations on
+	// one line remain visible on subsequent lines. Loaded whenever
+	// Teal *might* be used in this session:
+	//
+	//   - Scripted (non-interactive) runs load it only when Mode is
+	//     Teal, since scripted callers pick one language up front.
+	//   - Interactive runs load it always, since users can toggle
+	//     to Teal mode via the 't' activator at any time and expect
+	//     the session to be ready.
 	var tealSession *teal.Session
 
 	isTeal := opts.Mode == ModeTeal
-	if isTeal {
+	needTeal := isTeal || opts.Interactive
+	if needTeal {
 		if err := teal.Load(env.L); err != nil {
 			return fmt.Errorf("repl: load teal: %w", err)
 		}
@@ -191,16 +215,18 @@ func Run(opts Options) error {
 	prompt := opts.AppName + "(" + opts.Mode.String() + ")> "
 
 	if opts.Interactive {
-		return runInteractive(env, tealSession, isTeal, opts.AppName, strings.Join(bannerLines, "\n"))
+		return runInteractive(env, tealSession, opts.Mode, opts.AppName, strings.Join(bannerLines, "\n"))
 	}
 
-	return runScripted(env, tealSession, isTeal, opts, prompt, bannerLines)
+	return runScripted(env, tealSession, opts, prompt, bannerLines)
 }
 
 // runScripted is the plain-text loop used for pipes, tests, and any
 // non-TTY caller. Reads from opts.In, writes to opts.Out/ErrOut,
 // no terminal features.
-func runScripted(env *hexlua.Environment, session *teal.Session, isTeal bool, opts Options, prompt string, bannerLines []string) error {
+func runScripted(env *hexlua.Environment, session *teal.Session, opts Options, prompt string, bannerLines []string) error {
+	lang := opts.Mode.toLanguage()
+
 	for _, line := range bannerLines {
 		fmt.Fprintln(opts.Out, line)
 	}
@@ -231,11 +257,11 @@ func runScripted(env *hexlua.Environment, session *teal.Session, isTeal bool, op
 			continue
 		}
 
-		if err := evalLine(env, opts.Out, line, isTeal, session); err != nil {
+		if err := evalLine(env, opts.Out, line, lang, session); err != nil {
 			msg := trimTraceback(err.Error())
 			fmt.Fprintln(opts.ErrOut, "error:", msg)
 
-			if isTeal {
+			if lang == hexlua.Teal {
 				hint := tealErrorHint(msg)
 				if hint != "" {
 					fmt.Fprintln(opts.ErrOut, hint)
@@ -261,7 +287,7 @@ func runScripted(env *hexlua.Environment, session *teal.Session, isTeal bool, op
 // Julia-style: pressing 't' or 'l' at an empty prompt switches
 // modes. Pressing Backspace at an empty prompt in a non-default
 // mode returns to the default.
-func runInteractive(env *hexlua.Environment, session *teal.Session, isTeal bool, appName, banner string) error {
+func runInteractive(env *hexlua.Environment, session *teal.Session, defaultMode Mode, appName, banner string) error {
 	// Detect the terminal's color capability once. Used by the
 	// evaluator closure to reapply the profile after every
 	// SetOutput swap — charm.Logger.SetOutput rebuilds its
@@ -310,27 +336,32 @@ func runInteractive(env *hexlua.Environment, session *teal.Session, isTeal bool,
 		hexlog.SetColorProfile(profile) // MUST come after SetOutput
 		defer hexlog.SetOutput(os.Stderr)
 
-		modeIsTeal := mode == "teal"
+		var lang hexlua.Language
+		switch mode {
+		case "teal":
+			lang = hexlua.Teal
+		case "fennel":
+			lang = hexlua.Fennel
+		default:
+			lang = hexlua.Lua
+		}
 
-		// The Teal session only participates when this line is
-		// Teal-mode. Lua-mode lines skip the session and go through
-		// gopher-lua's own compilation path.
+		// The Teal session only participates in Teal mode. Other
+		// modes skip it and go through gopher-lua / Fennel directly.
 		var sess *teal.Session
-		if modeIsTeal {
+		if lang == hexlua.Teal {
 			sess = session
 		}
 
-		if err := evalLine(env, &outBuf, line, modeIsTeal, sess); err != nil {
-			// Syntactically incomplete? Ask the TUI to buffer more
-			// input rather than showing the parse error.
-			if isIncompleteError(err, modeIsTeal) {
+		if err := evalLine(env, &outBuf, line, lang, sess); err != nil {
+			if isIncompleteError(err, lang) {
 				return tuirepl.Result{Incomplete: true}
 			}
 
 			msg := trimTraceback(err.Error())
 			errText := "error: " + msg
 
-			if modeIsTeal {
+			if lang == hexlua.Teal {
 				if hint := tealErrorHint(msg); hint != "" {
 					errText += "\n" + hint
 				}
@@ -358,13 +389,27 @@ func runInteractive(env *hexlua.Environment, session *teal.Session, isTeal bool,
 		PromptColor:        lipgloss.Color("#000080"),
 	}
 
+	// Fennel mode: Lisp-flavoured Lua compiler. Prompt tinted the
+	// classic Clojure-ish blue-green.
+	fennelMode := tuirepl.Mode{
+		Name:               "fennel",
+		Activator:          'f',
+		Prompt:             appName + "(fnl)> ",
+		ContinuationPrompt: appName + "(fnl). ",
+		PromptColor:        lipgloss.Color("#63b132"),
+	}
+
 	// The FIRST mode in the slice is the default — what the user
 	// started with, and what Backspace-at-empty returns them to.
+	// Ordering the rest doesn't matter for logic, only display.
 	var modes []tuirepl.Mode
-	if isTeal {
-		modes = []tuirepl.Mode{tealMode, luaMode}
-	} else {
-		modes = []tuirepl.Mode{luaMode, tealMode}
+	switch defaultMode {
+	case ModeLua:
+		modes = []tuirepl.Mode{luaMode, tealMode, fennelMode}
+	case ModeFennel:
+		modes = []tuirepl.Mode{fennelMode, tealMode, luaMode}
+	default:
+		modes = []tuirepl.Mode{tealMode, luaMode, fennelMode}
 	}
 
 	model := tuirepl.New(tuirepl.Options{
@@ -527,14 +572,21 @@ func preloadTypedGlobals(env *hexlua.Environment, session *teal.Session, types m
 //	Teal        — messages like "expected 'end' to close construct",
 //	              "expected '}'", "expected ')'", "expected ']'"
 //	              indicate an unclosed block/literal.
-func isIncompleteError(err error, isTeal bool) bool {
+//
+//	Fennel      — balanced-paren language, so the error message is
+//	              typically "unexpected end of source" or contains
+//	              "expected closing" / "unfinished". Since Fennel
+//	              is Lisp-y, we're checking for open-paren/bracket
+//	              mismatch phrasing.
+func isIncompleteError(err error, lang hexlua.Language) bool {
 	if err == nil {
 		return false
 	}
 
 	msg := err.Error()
 
-	if isTeal {
+	switch lang {
+	case hexlua.Teal:
 		switch {
 		case strings.Contains(msg, "to close construct"),
 			strings.Contains(msg, "expected '}'"),
@@ -544,9 +596,21 @@ func isIncompleteError(err error, isTeal bool) bool {
 		}
 
 		return false
-	}
 
-	return strings.Contains(msg, "at EOF:")
+	case hexlua.Fennel:
+		switch {
+		case strings.Contains(msg, "unexpected end of source"),
+			strings.Contains(msg, "expected closing"),
+			strings.Contains(msg, "unfinished"),
+			strings.Contains(msg, "unclosed"):
+			return true
+		}
+
+		return false
+
+	default:
+		return strings.Contains(msg, "at EOF:")
+	}
 }
 
 // isExitDirective recognises the shell-conventional "exit" / "quit"
@@ -561,23 +625,32 @@ func isExitDirective(line string) bool {
 	}
 }
 
-// evalLine tries an expression form first (wrap in `return (...)`)
-// and falls back to a statement form when the expression fails to
-// compile. Prints top-of-stack when the expression form succeeds
-// and yields a non-nil value.
+// evalLine dispatches evaluation based on language.
 //
-// When session is non-nil, Teal compilation uses the persistent env
-// so declarations carry over across REPL lines.
-func evalLine(env *hexlua.Environment, out io.Writer, line string, isTeal bool, session *teal.Session) error {
-	// Expression form: prepend `return (` … `)` to capture the value.
-	wrapped := "return (" + line + ")"
+//	Lua / Teal — try expression form first (wrap in `return (...)`),
+//	             fall back to statement. Uses Teal session for
+//	             Teal mode when non-nil.
+//	Fennel    — compile straight through the Fennel compiler; the
+//	             compiler already emits `return ...` for top-level
+//	             expressions, so no wrap dance is needed.
+func evalLine(env *hexlua.Environment, out io.Writer, line string, lang hexlua.Language, tealSession *teal.Session) error {
+	if lang == hexlua.Fennel {
+		script, err := env.LoadString(line, "<repl>", hexlua.Fennel)
+		if err != nil {
+			return err
+		}
 
-	if script, err := loadReplChunk(env, session, wrapped, isTeal); err == nil {
 		return execAndPrint(env, out, script)
 	}
 
-	// Fall back to statement.
-	script, err := loadReplChunk(env, session, line, isTeal)
+	// Lua / Teal: expression-wrap trick.
+	wrapped := "return (" + line + ")"
+
+	if script, err := loadReplChunk(env, tealSession, wrapped, lang); err == nil {
+		return execAndPrint(env, out, script)
+	}
+
+	script, err := loadReplChunk(env, tealSession, line, lang)
 	if err != nil {
 		return err
 	}
@@ -585,11 +658,17 @@ func evalLine(env *hexlua.Environment, out io.Writer, line string, isTeal bool, 
 	return env.Exec(script)
 }
 
-// loadReplChunk compiles a REPL line. When a Teal session is present,
-// uses its persistent env so prior declarations stay in scope.
-func loadReplChunk(env *hexlua.Environment, session *teal.Session, source string, isTeal bool) (*hexlua.Script, error) {
-	if !isTeal || session == nil {
-		return env.LoadString(source, "<repl>", isTeal)
+// loadReplChunk compiles a Lua/Teal REPL line. Teal source with a
+// live session uses the persistent env so prior declarations stay
+// in scope. Not used for Fennel (Fennel dispatch is handled directly
+// in evalLine).
+func loadReplChunk(env *hexlua.Environment, session *teal.Session, source string, lang hexlua.Language) (*hexlua.Script, error) {
+	if lang != hexlua.Teal {
+		return env.LoadString(source, "<repl>", hexlua.Lua)
+	}
+
+	if session == nil {
+		return env.LoadString(source, "<repl>", hexlua.Teal)
 	}
 
 	luaSrc, err := session.Compile(source, "<repl>")

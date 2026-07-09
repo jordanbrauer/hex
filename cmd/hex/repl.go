@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/mattn/go-isatty"
@@ -10,29 +11,38 @@ import (
 )
 
 func newReplCommand() *cobra.Command {
-	var asLua bool
+	var modeFlag string
 
 	cmd := &cobra.Command{
 		Use:   "repl",
-		Short: "Interactive Teal (or Lua) REPL",
+		Short: "Interactive Teal / Lua / Fennel REPL",
 		Long: `Launch an interactive REPL that evaluates Teal by default.
-Pass --lua for a Lua-only session.
+Use --mode to start in a different language:
 
-Each line is first tried as an expression (wrapped in return (…)):
-the value is printed if non-nil. If that fails to compile, the line
-is executed as a statement.
+  hex repl              # Teal (default)
+  hex repl --mode lua   # Lua
+  hex repl --mode fnl   # Fennel
 
-The runtime is bare gopher-lua + Teal; no hex modules are pre-loaded.
-Scaffolded apps get a container-aware REPL via their own binary
-(e.g. "myapp repl") — that one has access to db, cache, config, and
-whatever the app registers itself.
+In interactive mode, switch languages on the fly at an empty prompt:
+
+  t   → Teal    (color: #3e8b9b)
+  l   → Lua     (color: #000080)
+  f   → Fennel  (color: #63b132)
+
+Backspace on an empty prompt in a non-default mode returns to the
+language you launched with.
+
+The runtime is bare gopher-lua + the requested compiler; no hex
+modules are pre-loaded. Scaffolded apps get a container-aware REPL
+via "<appname> repl" — that one has access to db, cache, config,
+and whatever the app registers.
 
 Exit with Ctrl+D, "exit", or "quit".`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			mode := repl.ModeTeal
-			if asLua {
-				mode = repl.ModeLua
+			mode, err := parseReplMode(modeFlag)
+			if err != nil {
+				return err
 			}
 
 			return repl.Run(repl.Options{
@@ -46,7 +56,22 @@ Exit with Ctrl+D, "exit", or "quit".`,
 		},
 	}
 
-	cmd.Flags().BoolVar(&asLua, "lua", false, "evaluate input as Lua instead of Teal")
+	cmd.Flags().StringVar(&modeFlag, "mode", "", "starting language: teal (default), lua, fennel")
 
 	return cmd
+}
+
+// parseReplMode maps the --mode flag string to a repl.Mode. Empty
+// string defaults to Teal.
+func parseReplMode(s string) (repl.Mode, error) {
+	switch s {
+	case "", "teal", "tl":
+		return repl.ModeTeal, nil
+	case "lua":
+		return repl.ModeLua, nil
+	case "fennel", "fnl":
+		return repl.ModeFennel, nil
+	default:
+		return repl.ModeTeal, fmt.Errorf("repl: unknown --mode %q (expected teal, lua, or fennel)", s)
+	}
 }

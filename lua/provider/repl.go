@@ -97,12 +97,16 @@ func resolveMode(app *hex.App, override string) repl.Mode {
 // letting callers fall through to the next source in precedence.
 func parseMode(s string) *repl.Mode {
 	switch s {
-	case "teal":
+	case "teal", "tl":
 		m := repl.ModeTeal
 
 		return &m
 	case "lua":
 		m := repl.ModeLua
+
+		return &m
+	case "fennel", "fnl":
+		m := repl.ModeFennel
 
 		return &m
 	default:
