@@ -291,6 +291,12 @@ func runInteractive(env *hexlua.Environment, session *teal.Session, isTeal bool,
 		}
 
 		if err := evalLine(env, &outBuf, line, modeIsTeal, sess); err != nil {
+			// Syntactically incomplete? Ask the TUI to buffer more
+			// input rather than showing the parse error.
+			if isIncompleteError(err, modeIsTeal) {
+				return tuirepl.Result{Incomplete: true}
+			}
+
 			msg := trimTraceback(err.Error())
 			errText := "error: " + msg
 
@@ -307,17 +313,19 @@ func runInteractive(env *hexlua.Environment, session *teal.Session, isTeal bool,
 	}
 
 	tealMode := tuirepl.Mode{
-		Name:        "teal",
-		Activator:   't',
-		Prompt:      appName + "(teal)> ",
-		PromptColor: lipgloss.Color("#3e8b9b"),
+		Name:               "teal",
+		Activator:          't',
+		Prompt:             appName + "(teal)> ",
+		ContinuationPrompt: appName + "(teal). ",
+		PromptColor:        lipgloss.Color("#3e8b9b"),
 	}
 
 	luaMode := tuirepl.Mode{
-		Name:        "lua",
-		Activator:   'l',
-		Prompt:      appName + "(lua)> ",
-		PromptColor: lipgloss.Color("#000080"),
+		Name:               "lua",
+		Activator:          'l',
+		Prompt:             appName + "(lua)> ",
+		ContinuationPrompt: appName + "(lua). ",
+		PromptColor:        lipgloss.Color("#000080"),
 	}
 
 	// The FIRST mode in the slice is the default — what the user
@@ -472,6 +480,42 @@ func preloadTypedGlobals(env *hexlua.Environment, session *teal.Session, types m
 	}
 
 	return nil
+}
+
+// isIncompleteError reports whether err from evalLine indicates the
+// user's input is syntactically incomplete rather than genuinely
+// wrong. When true the interactive REPL keeps the input buffered
+// and shows a continuation prompt on the next line.
+//
+// Detection heuristics:
+//
+//	gopher-lua — "at EOF:" appears in the error when the parser
+//	              hit end-of-input while expecting more. Real
+//	              errors report a specific line:column.
+//
+//	Teal        — messages like "expected 'end' to close construct",
+//	              "expected '}'", "expected ')'", "expected ']'"
+//	              indicate an unclosed block/literal.
+func isIncompleteError(err error, isTeal bool) bool {
+	if err == nil {
+		return false
+	}
+
+	msg := err.Error()
+
+	if isTeal {
+		switch {
+		case strings.Contains(msg, "to close construct"),
+			strings.Contains(msg, "expected '}'"),
+			strings.Contains(msg, "expected ')'"),
+			strings.Contains(msg, "expected ']'"):
+			return true
+		}
+
+		return false
+	}
+
+	return strings.Contains(msg, "at EOF:")
 }
 
 // isExitDirective recognises the shell-conventional "exit" / "quit"

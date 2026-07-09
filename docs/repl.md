@@ -204,17 +204,41 @@ has no file, and history isn't important enough to block the REPL.
 
 Up/Down at the prompt cycles through it just like any REPL.
 
+## Multi-line input
+
+When you hit Enter on syntactically incomplete input, the REPL
+switches to a continuation prompt (`myapp(teal). `) and buffers
+your next line onto the current one:
+
+```
+myapp(teal)> function greet(name: string)
+myapp(teal).   log.info("hi " .. name)
+myapp(teal). end
+myapp(teal)> greet("world")
+INFO hi world
+```
+
+Incomplete detection is heuristic — the REPL checks the parser's
+error message for characteristic patterns (Teal: "to close
+construct", `expected '}'/')'/']'`; Lua: "at EOF:"). Genuine
+syntax errors on complete input still surface immediately with a
+red error.
+
+Ctrl+C during continuation **aborts** the pending buffer and drops
+back to the main prompt (Python REPL convention). Ctrl+C on an
+empty first-line prompt still quits.
+
+Up/Down history treats a whole multi-line entry as a single item,
+so you can recall a function definition and edit it as a unit.
+
 ## Limitations & follow-ups
 
-- **No tab completion** — the biggest UX gap. Would introspect
-  registered modules (`db.<TAB>` → `query queryOne exec
-  transaction`) plus Teal-scope locals. Substantial work; on the
-  pile as pi-fox.6.
+- **No tab completion** — the biggest remaining UX gap. Would
+  introspect registered modules (`db.<TAB>` → `query queryOne
+  exec transaction`) plus Teal-scope locals. Substantial work;
+  on the pile as pi-fox.6.
 - **No Ctrl+R reverse history search** — medium effort; a
   dedicated "search mode" over the persisted history.
-- **No multi-line continuation** — function definitions must be
-  one-liners or come from a script file. Needs incomplete-parse
-  detection.
 - **No multi-line continuation** — function definitions must be
   one-liners or come from a script file. Follow-up: pi-fox.6.
 - **No dot-commands** — `.help`, `.mode`, `.env`, `.reset` are on
