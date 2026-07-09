@@ -1,0 +1,38 @@
+{{`{{ define "pages/home" }}`}}
+{{`{{ template "layouts/main" . }}`}}
+{{`{{ end }}`}}
+
+{{`{{ define "content" }}`}}
+<main class="mx-auto max-w-3xl px-6 py-12" x-data="{ count: 0 }">
+    <h1 class="text-4xl font-bold tracking-tight">{{`{{ .Heading }}`}}</h1>
+    <p class="mt-4 text-lg text-slate-600">
+        {{`{{ .Message }}`}}
+    </p>
+
+    <div class="mt-8 flex gap-3 items-center">
+        <button
+            @click="count++"
+            class="rounded-lg bg-slate-900 px-4 py-2 text-white font-medium hover:bg-slate-800"
+        >
+            Clicked <span x-text="count"></span> times
+        </button>
+
+        <button
+            hx-get="/greet"
+            hx-target="#greeting"
+            hx-swap="innerHTML"
+            class="rounded-lg border border-slate-300 px-4 py-2 font-medium hover:bg-slate-100"
+        >
+            Fetch a greeting
+        </button>
+    </div>
+
+    <div id="greeting" class="mt-6 text-slate-700"></div>
+</main>
+{{`{{ end }}`}}
+
+{{`{{ define "partials/greeting" }}`}}
+<p class="rounded-md bg-emerald-50 p-4 text-emerald-900">
+    Hello, {{`{{ .Name }}`}} — server said hi at {{`{{ .Time }}`}}.
+</p>
+{{`{{ end }}`}}

@@ -5,7 +5,11 @@ import (
 	"github.com/jordanbrauer/hex/provider"
 	"github.com/jordanbrauer/hex/web"
 
+{{- if .HasFrontend }}
+	"{{.ModulePath}}/app/controller"
+{{- else }}
 	_ "{{.ModulePath}}/app/controller"
+{{- end }}
 )
 
 // Routes wires application HTTP routes onto the *web.Server registered
@@ -31,6 +35,12 @@ func (p *Routes) Register(app provider.Application) error {
 
 	e := server.Echo()
 	_ = e // silences the unused warning until the first route is wired
+
+{{- if .HasFrontend }}
+	home := controller.NewHome()
+	e.GET("/", home.Index)
+	e.GET("/greet", home.Greet)
+{{- end }}
 
 	// hex:routes
 

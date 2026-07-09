@@ -1,0 +1,17 @@
+package provider
+
+import (
+	viewprovider "github.com/jordanbrauer/hex/view/provider"
+
+	"{{.ModulePath}}/web/views"
+)
+
+// View wires the hex/view Engine into the *web.Server registered by
+// the web provider. Add layout/partial/page files under web/views/
+// and reference them from controllers via c.Render(200, "pages/home",
+// data).
+func View() *viewprovider.Provider {
+	return &viewprovider.Provider{
+		FS: views.Files,
+	}
+}

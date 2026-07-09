@@ -1,0 +1,15 @@
+/** @type {import("tailwindcss").Config} */
+export default {
+    content: [
+        "./web/views/**/*.gotmpl",
+{{- if .FrontendTS }}
+        "./resources/js/**/*.{ts,tsx}",
+{{- else }}
+        "./public/js/**/*.js",
+{{- end }}
+    ],
+    theme: {
+        extend: {},
+    },
+    plugins: [],
+};

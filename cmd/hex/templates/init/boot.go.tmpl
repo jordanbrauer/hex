@@ -53,6 +53,9 @@ func Boot(kernel *hex.App) error {
 		provider.AI(),
 {{- end }}
 {{- if .Web }}
+{{- if .HasFrontend }}
+		provider.View(),
+{{- end }}
 		&provider.Routes{},
 {{- end }}
 		// hex:providers

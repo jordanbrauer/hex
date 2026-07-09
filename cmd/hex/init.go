@@ -46,6 +46,7 @@ type initConfig struct {
 	I18n        bool
 	Featureflag bool
 	AI          string // "openai" | "anthropic" | "none"
+	Frontend    string // "js" | "ts" | "none"
 
 	// GoVersion is the Go directive (e.g. "1.26"). Defaults to the
 	// running toolchain.
@@ -68,6 +69,16 @@ func (c initConfig) HasTelemetry() bool { return c.Telemetry != "" && c.Telemetr
 // HasAI reports whether the ai provider should be scaffolded.
 func (c initConfig) HasAI() bool { return c.AI != "" && c.AI != "none" }
 
+// HasFrontend reports whether frontend assets should be scaffolded.
+// Frontend is only meaningful when Web is enabled.
+func (c initConfig) HasFrontend() bool {
+	return c.Web && c.Frontend != "" && c.Frontend != "none"
+}
+
+// FrontendTS reports whether the TypeScript-with-build variant is
+// scaffolded (vs the no-build JS variant).
+func (c initConfig) FrontendTS() bool { return c.Frontend == "ts" }
+
 func newInitCommand() *cobra.Command {
 	var (
 		modulePath  string
@@ -81,6 +92,7 @@ func newInitCommand() *cobra.Command {
 		i18nFlag    bool
 		featureflag bool
 		aiFlag      string
+		frontend    string
 		yes         bool
 		force       bool
 	)
@@ -106,6 +118,7 @@ func newInitCommand() *cobra.Command {
 				i18n:        i18nFlag,
 				featureflag: featureflag,
 				ai:          aiFlag,
+				frontend:    frontend,
 				yes:         yes,
 			})
 			if err != nil {
@@ -133,6 +146,7 @@ func newInitCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&i18nFlag, "i18n", false, "scaffold an i18n (gotext) provider")
 	cmd.Flags().BoolVar(&featureflag, "featureflag", false, "scaffold a featureflag (GOFF) provider")
 	cmd.Flags().StringVar(&aiFlag, "ai", "none", "AI provider: openai, anthropic, none")
+	cmd.Flags().StringVar(&frontend, "frontend", "none", "frontend stack: js (no build), ts (Laravel Mix), none (default)")
 	cmd.Flags().BoolVar(&yes, "yes", false, "skip interactive prompts, use flag defaults")
 	cmd.Flags().BoolVar(&force, "force", false, "overwrite existing files")
 
@@ -153,6 +167,7 @@ type resolveFlags struct {
 	i18n        bool
 	featureflag bool
 	ai          string
+	frontend    string
 	yes         bool
 }
 
@@ -171,6 +186,7 @@ func resolveInitConfig(args []string, f resolveFlags) (initConfig, error) {
 		I18n:        f.i18n,
 		Featureflag: f.featureflag,
 		AI:          f.ai,
+		Frontend:    f.frontend,
 	}
 
 	// Resolve the target directory + project name.
@@ -256,6 +272,14 @@ func runInitPrompts(cfg *initConfig) error {
 		extras = append(extras, "ai")
 	}
 
+	if cfg.HasFrontend() {
+		if cfg.FrontendTS() {
+			extras = append(extras, "frontend-ts")
+		} else {
+			extras = append(extras, "frontend-js")
+		}
+	}
+
 	form := huh.NewForm(
 		huh.NewGroup(
 			huh.NewInput().
@@ -287,6 +311,8 @@ func runInitPrompts(cfg *initConfig) error {
 					huh.NewOption("i18n       (gotext translations)", "i18n"),
 					huh.NewOption("featureflag (GOFF)", "featureflag"),
 					huh.NewOption("ai         (charm/fantasy LLM agent)", "ai"),
+					huh.NewOption("frontend-js  (htmx + alpine + tailwind, no build)", "frontend-js"),
+					huh.NewOption("frontend-ts  (htmx + alpine + tailwind + laravel-mix TS build)", "frontend-ts"),
 				).
 				Value(&extras),
 		),
@@ -339,6 +365,21 @@ func applyExtras(cfg *initConfig, extras []string) {
 	} else {
 		cfg.AI = "none"
 	}
+
+	switch {
+	case set["frontend-ts"]:
+		cfg.Frontend = "ts"
+	case set["frontend-js"]:
+		cfg.Frontend = "js"
+	default:
+		cfg.Frontend = "none"
+	}
+
+	// Frontend requires web. Auto-enable web if the user picked a
+	// frontend but forgot the web option.
+	if cfg.Frontend != "" && cfg.Frontend != "none" {
+		cfg.Web = true
+	}
 }
 
 // validate rejects an initConfig with obviously bad inputs.
@@ -381,6 +422,16 @@ func (c initConfig) validate() error {
 	case "", "none", "openai", "anthropic":
 	default:
 		return fmt.Errorf("unknown --ai value %q (want openai, anthropic, or none)", c.AI)
+	}
+
+	switch c.Frontend {
+	case "", "none", "js", "ts":
+	default:
+		return fmt.Errorf("unknown --frontend value %q (want js, ts, or none)", c.Frontend)
+	}
+
+	if c.Frontend != "" && c.Frontend != "none" && !c.Web {
+		return fmt.Errorf("--frontend %q requires --web", c.Frontend)
 	}
 
 	return nil
@@ -441,6 +492,10 @@ func scaffold(cfg initConfig, force bool) error {
 
 	if cfg.HasAI() {
 		files = append(files, componentFiles("ai", cfg)...)
+	}
+
+	if cfg.HasFrontend() {
+		files = append(files, frontendFiles(cfg)...)
 	}
 
 	for _, f := range files {
@@ -548,6 +603,43 @@ func databaseFiles(cfg initConfig) []fileSpec {
 		{"templates/init/initial_migration.up.sql.tmpl", filepath.Join(cfg.Directory, "database", "migrations", "00000000000000_init.up.sql")},
 		{"templates/init/initial_migration.down.sql.tmpl", filepath.Join(cfg.Directory, "database", "migrations", "00000000000000_init.down.sql")},
 	}
+}
+
+// frontendFiles emits the frontend toolchain + web/views/public/
+// scaffolding when --frontend is enabled. Shared between js and ts
+// modes; TS-only files are gated inside the template via .FrontendTS.
+func frontendFiles(cfg initConfig) []fileSpec {
+	base := "templates/init/frontend"
+	dir := cfg.Directory
+
+	specs := []fileSpec{
+		{base + "/package.json.tmpl", filepath.Join(dir, "package.json")},
+		{base + "/biome.json.tmpl", filepath.Join(dir, "biome.json")},
+		{base + "/tailwind.config.js.tmpl", filepath.Join(dir, "tailwind.config.js")},
+		{base + "/vitest.config.js.tmpl", filepath.Join(dir, "vitest.config.js")},
+
+		{base + "/resources_css_app.css.tmpl", filepath.Join(dir, "resources", "css", "app.css")},
+		{base + "/web_views_layouts_main.gotmpl.tmpl", filepath.Join(dir, "web", "views", "layouts", "main.gotmpl")},
+		{base + "/web_views_pages_home.gotmpl.tmpl", filepath.Join(dir, "web", "views", "pages", "home.gotmpl")},
+		{base + "/web_views_embed.go.tmpl", filepath.Join(dir, "web", "views", "views.go")},
+		{base + "/provider_view.go.tmpl", filepath.Join(dir, "app", "provider", "view.go")},
+		{base + "/controller_home.go.tmpl", filepath.Join(dir, "app", "controller", "home.go")},
+		{base + "/public_gitkeep.tmpl", filepath.Join(dir, "public", ".gitkeep")},
+	}
+
+	if cfg.FrontendTS() {
+		specs = append(specs,
+			fileSpec{base + "/tsconfig.json.tmpl", filepath.Join(dir, "tsconfig.json")},
+			fileSpec{base + "/webpack.mix.js.tmpl", filepath.Join(dir, "webpack.mix.js")},
+			fileSpec{base + "/resources_js_app.ts.tmpl", filepath.Join(dir, "resources", "js", "app.ts")},
+		)
+	} else {
+		specs = append(specs,
+			fileSpec{base + "/public_js_app.js.tmpl", filepath.Join(dir, "public", "js", "app.js")},
+		)
+	}
+
+	return specs
 }
 
 // componentFiles returns the templates for an opt-in component. Config

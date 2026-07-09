@@ -1,0 +1,33 @@
+package controller
+
+import (
+	"net/http"
+	"time"
+
+	"github.com/labstack/echo/v4"
+)
+
+// Home renders the landing page + serves a small HTMX endpoint the
+// starter template calls into.
+type Home struct{}
+
+// NewHome constructs a Home controller.
+func NewHome() *Home { return &Home{} }
+
+// Index renders the full page.
+func (c *Home) Index(ctx echo.Context) error {
+	return ctx.Render(http.StatusOK, "pages/home", map[string]any{
+		"Title":   "{{.Name}}",
+		"Heading": "Welcome to {{.Name}}",
+		"Message": "Edit web/views/pages/home.gotmpl and refresh — no rebuild needed.",
+	})
+}
+
+// Greet returns an HTMX fragment. The template is a {{`{{ define "partials/greeting" }}`}}
+// block in home.gotmpl; the browser swaps it into #greeting.
+func (c *Home) Greet(ctx echo.Context) error {
+	return ctx.Render(http.StatusOK, "partials/greeting", map[string]any{
+		"Name": "friend",
+		"Time": time.Now().Format(time.Kitchen),
+	})
+}

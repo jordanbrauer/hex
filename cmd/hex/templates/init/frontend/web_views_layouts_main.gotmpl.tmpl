@@ -1,0 +1,21 @@
+{{`{{ define "layouts/main" }}`}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{`{{ .Title }}`}}</title>
+    <link rel="stylesheet" href="/css/app.css">
+    <script src="/vendor/htmx.min.js" defer></script>
+    <script src="/vendor/cdn.min.js" defer></script>
+{{- if .FrontendTS }}
+    <script src="/js/app.js" defer></script>
+{{- else }}
+    <script src="/js/app.js" defer></script>
+{{- end }}
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-900">
+    {{`{{ block "content" . }}{{ end }}`}}
+</body>
+</html>
+{{`{{ end }}`}}

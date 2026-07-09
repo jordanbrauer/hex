@@ -53,6 +53,13 @@ type Provider struct {
 	// ExtraOptions extend the web.Options built from config.
 	ExtraOptions web.Options
 
+	// PublicDir, when non-empty, is served at / via echo.Static. Use
+	// this to expose a compiled `public/` directory of CSS, JS, and
+	// images alongside your Go routes. Route order matters — static
+	// files are matched by path, so explicit routes registered on
+	// the same path (e.g. `/`) win.
+	PublicDir string
+
 	// Configure runs after Register — receives the Server so consumer
 	// providers can register routes and middleware before Boot starts
 	// the listener.
@@ -76,6 +83,10 @@ func (p *Provider) Register(app provider.Application) error {
 
 	opts := p.buildOptions(store)
 	p.server = web.New(opts)
+
+	if p.PublicDir != "" {
+		p.server.Echo().Static("/", p.PublicDir)
+	}
 
 	if p.Configure != nil {
 		if err := p.Configure(p.server); err != nil {

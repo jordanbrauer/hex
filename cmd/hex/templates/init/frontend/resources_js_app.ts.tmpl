@@ -1,0 +1,17 @@
+// Application-owned TypeScript. Alpine and HTMX are imported so the
+// build has type information; runtime script tags in the layout
+// serve the minified vendor files.
+
+import htmx from "htmx.org";
+import Alpine from "alpinejs";
+
+// Expose Alpine so components declared with x-data can bind to it.
+(window as unknown as { Alpine: typeof Alpine }).Alpine = Alpine;
+Alpine.start();
+
+document.body.addEventListener("htmx:beforeRequest", (event: Event) => {
+    const detail = (event as CustomEvent).detail as { requestConfig?: { path?: string } };
+    console.debug("htmx →", detail.requestConfig?.path);
+});
+
+export { htmx, Alpine };
