@@ -1,0 +1,62 @@
+# Instructions for coding agents
+
+This is **{{.Name}}**, an application built on the [hex](https://github.com/jordanbrauer/hex)
+Go framework. This file is the fast path for AI coding agents working in this
+repository. The authoritative, always-current reference is the hex manpages:
+
+- `man hex` — the CLI and its generators (**hex**(1))
+- `man 7 hex` — the framework conventions: layout, markers, provider lifecycle
+- `man 5 hex` — the config file formats (TOML, env map, CUE schema)
+- `man 3 hex` — the embedded Lua module API
+
+## Generate, don't hand-author
+
+Prefer the `hex` generators over writing files by hand. They place code in the
+canonical location, apply the naming conventions, and **auto-wire** it into the
+app — the parts that are easy to get wrong. Preview any generator with
+`--dry-run` (add `--format json` for machine-readable output) before committing.
+
+- `hex make:provider <name>` — a service provider, wired into `app/boot.go`
+- `hex make:domain <name>` — a domain package (entity, repository port, service, errors)
+{{- if .HasDatabase}}
+- `hex make:migration <name>` — a timestamped SQL migration pair
+- `hex make:adapter <domain>` — a SQL adapter implementing a domain repository
+{{- end}}
+- `hex make:command <name>` — a Cobra command, wired into `app/command/root.go`
+{{- if .Web}}
+- `hex make:controller <name>` — an HTTP controller, wired into `app/provider/routes.go`
+{{- end}}
+
+Run `hex make:<cmd> --help` for the full flag set, or `man hex` for all of them.
+
+## Layout
+
+- `app/` — wiring: `boot.go` (provider order), `provider/`, `command/`{{if .Web}}, `controller/`{{end}}
+- `domain/` — business logic; depends on nothing outside itself
+- `infrastructure/` — adapters implementing domain ports
+- `config/` — TOML config, `schema.cue`, env map (see `man 5 hex`)
+{{- if .HasDatabase}}
+- `database/` — migrations
+{{- end}}
+
+## Marker comments — never remove them
+
+The generators wire new code by inserting above marker comments. Keep each one
+on its own line:
+
+- `// hex:providers` in `app/boot.go`
+- `// hex:commands` in `app/command/root.go`
+{{- if .Web}}
+- `// hex:routes` in `app/provider/routes.go`
+{{- end}}
+- `// hex:repl` in `app/provider/repl_bindings.go`
+
+## Verify your changes
+
+```
+just check        # fmt-check + lint + vet + race tests
+{{- if .Web}}
+go run . serve    # boot the app and exercise it
+{{- end}}
+go test ./...     # unit + end-to-end (webtest) tests
+```

@@ -30,21 +30,14 @@ var publishables = map[string]fs.FS{
 
 func newPublishCommand() *cobra.Command {
 	var (
-		force bool
+		flags genFlags
 		all   bool
 	)
 
 	cmd := &cobra.Command{
 		Use:   "publish [component]",
 		Short: "Copy a framework provider's config files into config/",
-		Long: "Copy the config files that a hex framework provider ships (via its\n" +
-			"embedded Configs() fs.FS) into your project's config/ directory so you\n" +
-			"can inspect and edit them. Files are copied as-is; the framework's\n" +
-			"original defaults still apply as a fallback when your local copy is\n" +
-			"missing a field.\n\n" +
-			"Components: " + strings.Join(publishableNames(), ", ") + "\n\n" +
-			"Pass --all to publish every framework component at once. Pass --force to\n" +
-			"overwrite existing files.",
+		Long:  helpLong("publish") + "\n\nComponents: " + strings.Join(publishableNames(), ", ") + ".",
 		Args: func(cmd *cobra.Command, args []string) error {
 			if all && len(args) > 0 {
 				return errors.New("--all cannot be combined with a component name")
@@ -64,8 +57,10 @@ func newPublishCommand() *cobra.Command {
 
 			confDir := filepath.Join(root, "config")
 
-			g := newGenerator()
-			g.force = force
+			g, err := newGeneratorFromFlags(flags)
+			if err != nil {
+				return err
+			}
 
 			names := args
 			if all {
@@ -84,15 +79,16 @@ func newPublishCommand() *cobra.Command {
 				}
 
 				if n == 0 {
-					fmt.Println("no files to publish for", name)
+					g.record("skip", name, "no files to publish")
 				}
 			}
 
-			return nil
+			return g.report()
 		},
 	}
 
-	cmd.Flags().BoolVar(&force, "force", false, "overwrite existing files")
+	setExample(cmd, "publish")
+	addGeneratorFlags(cmd, &flags)
 	cmd.Flags().BoolVar(&all, "all", false, "publish every framework component")
 
 	return cmd

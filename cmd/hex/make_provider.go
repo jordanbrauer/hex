@@ -16,14 +16,13 @@ type providerData struct {
 }
 
 func newMakeProviderCommand() *cobra.Command {
-	var force bool
+	var flags genFlags
 
 	cmd := &cobra.Command{
 		Use:   "make:provider <name>",
+		Args:  cobra.ExactArgs(1),
 		Short: "Generate a service provider",
-		Long: "Create provider/<name>.go and wire it into provider/boot.go.\n\n" +
-			"The name is normalised to PascalCase for the type and lower-case for the filename.",
-		Args: cobra.ExactArgs(1),
+		Long:  helpLong("make_provider"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, modulePath, err := projectRoot()
 			if err != nil {
@@ -42,8 +41,10 @@ func newMakeProviderCommand() *cobra.Command {
 
 			target := filepath.Join(root, "app", "provider", snakeCase(name)+".go")
 
-			g := newGenerator()
-			g.force = force
+			g, err := newGeneratorFromFlags(flags)
+			if err != nil {
+				return err
+			}
 
 			if err := g.render("templates/provider.go.tmpl", target, data); err != nil {
 				return err
@@ -53,17 +54,16 @@ func newMakeProviderCommand() *cobra.Command {
 			bootFile := filepath.Join(root, "app", "boot.go")
 			registration := fmt.Sprintf("&provider.%s{},", data.Name)
 
-			if err := insertBeforeMarker(bootFile, "// hex:providers", registration); err != nil {
+			if err := g.wireMarker(bootFile, "// hex:providers", registration, "added "+data.Name); err != nil {
 				return fmt.Errorf("wire into boot.go: %w", err)
 			}
 
-			fmt.Println("→", bootFile, "(added", data.Name+")")
-
-			return nil
+			return g.report()
 		},
 	}
 
-	cmd.Flags().BoolVar(&force, "force", false, "overwrite existing files")
+	setExample(cmd, "make_provider")
+	addGeneratorFlags(cmd, &flags)
 
 	return cmd
 }

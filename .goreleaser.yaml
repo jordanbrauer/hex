@@ -22,6 +22,15 @@ version: 2
 project_name: hex
 dist: ./dist
 
+# Render the manpages before building so they can be packaged into the
+# archives and installed by the Homebrew formula. gen-man rewrites the
+# generated markdown from the live command tree; pandoc renders every
+# docs/man/*.md to roff. Requires pandoc on the release runner.
+before:
+  hooks:
+    - go run ./cmd/hex gen-man
+    - bash -c 'mkdir -p man && for f in docs/man/*.md; do pandoc -s -t man "$f" -o "man/$(basename "$f" .md)"; done'
+
 builds:
   - id: hex
     main: ./cmd/hex
@@ -59,6 +68,13 @@ archives:
       {{- .Os }}_
       {{- if eq .Arch "amd64" }}x86_64
       {{- else }}{{ .Arch }}{{ end }}
+    # Ship the rendered manpages alongside the binary so the formula can
+    # install them.
+    files:
+      - man/hex.1
+      - man/hex.3
+      - man/hex.5
+      - man/hex.7
 
 checksum:
   name_template: "checksums.txt"
@@ -113,5 +129,9 @@ brews:
     # loader accepts formulas at ./, Formula/, or HomebrewFormula/.
     install: |
       bin.install "hex"
+      man1.install "man/hex.1"
+      man3.install "man/hex.3"
+      man5.install "man/hex.5"
+      man7.install "man/hex.7"
     test: |
       system bin/"hex", "--help"

@@ -25,6 +25,11 @@ jobs:
         with:
           go-version-file: go.mod
 
+      # pandoc renders the manpages in GoReleaser's `before` hook so they
+      # can be packaged into the archives and installed by the formula.
+      - name: Install pandoc
+        run: sudo apt-get update && sudo apt-get install -y pandoc
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:

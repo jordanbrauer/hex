@@ -53,6 +53,18 @@ fmt-check:
 tidy:
     go mod tidy
 
+# Regenerate the manpage markdown sources and render them to roff with
+# pandoc. Requires pandoc on PATH. Generated: docs/man/hex.{1,3}.md;
+# hand-authored: docs/man/hex.5.md, docs/man/hex.7.md.
+man:
+    go run ./cmd/hex gen-man
+    @mkdir -p man
+    @for f in docs/man/*.md; do \
+        base=$(basename "$f" .md); \
+        pandoc -s -t man "$f" -o "man/$base"; \
+        echo "→ man/$base"; \
+    done
+
 # Full pre-commit gate: format check, lint, vet, race tests.
 check: fmt-check lint vet race
 

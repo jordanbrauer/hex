@@ -16,14 +16,13 @@ type domainData struct {
 }
 
 func newMakeDomainCommand() *cobra.Command {
-	var force bool
+	var flags genFlags
 
 	cmd := &cobra.Command{
 		Use:   "make:domain <name>",
+		Args:  cobra.ExactArgs(1),
 		Short: "Generate a domain package",
-		Long: "Create domain/<name>/{<name>,repository,service,errors}.go.\n\n" +
-			"The name is normalised to lower-case for the package name and PascalCase for the type.",
-		Args: cobra.ExactArgs(1),
+		Long:  helpLong("make_domain"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, modulePath, err := projectRoot()
 			if err != nil {
@@ -51,8 +50,10 @@ func newMakeDomainCommand() *cobra.Command {
 				{"templates/domain/errors.go.tmpl", filepath.Join(dir, "errors.go")},
 			}
 
-			g := newGenerator()
-			g.force = force
+			g, err := newGeneratorFromFlags(flags)
+			if err != nil {
+				return err
+			}
 
 			for _, f := range files {
 				if err := g.render(f.tpl, f.target, data); err != nil {
@@ -60,11 +61,12 @@ func newMakeDomainCommand() *cobra.Command {
 				}
 			}
 
-			return nil
+			return g.report()
 		},
 	}
 
-	cmd.Flags().BoolVar(&force, "force", false, "overwrite existing files")
+	setExample(cmd, "make_domain")
+	addGeneratorFlags(cmd, &flags)
 
 	return cmd
 }
