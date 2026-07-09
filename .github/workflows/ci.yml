@@ -85,5 +85,17 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: test (race)
-        run: go test -race ./...
+      # Coverage profile is generated on every matrix leg (so failing
+      # tests on either OS still surface), but only ubuntu uploads to
+      # Codecov. Two uploads per run would double-count line hits.
+      # -covermode=atomic is required with -race.
+      - name: test (race + coverage)
+        run: go test -race -covermode=atomic -coverprofile=coverage.txt ./...
+
+      - name: Upload coverage to Codecov
+        if: matrix.os == 'ubuntu-latest'
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.txt
+          fail_ci_if_error: false

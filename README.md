@@ -1,5 +1,6 @@
 <p align="center">
     <a href="https://github.com/jordanbrauer/hex/actions/workflows/ci.yml"><img alt="ci" src="https://github.com/jordanbrauer/hex/actions/workflows/ci.yml/badge.svg"></a>
+    <a href="https://codecov.io/github/jordanbrauer/hex"><img alt="codecov" src="https://codecov.io/github/jordanbrauer/hex/graph/badge.svg?token=LVKM42O8FD"></a>
     <a href="https://pkg.go.dev/github.com/jordanbrauer/hex"><img alt="godoc" src="https://pkg.go.dev/badge/github.com/jordanbrauer/hex.svg"></a>
     <a href="LICENSE"><img alt="license" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
 </p>
