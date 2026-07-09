@@ -251,8 +251,8 @@ func Any(key string, value any) Attr { return slog.Any(key, value) }
 func Group(key string, args ...any) Attr { return slog.Group(key, args...) }
 
 // applyDefaultStyles installs hex's colour palette on the given handler.
-// Matches finch-cli's existing colours so users switching to hex see no
-// visual change.
+// Uses the standard ANSI base-16 palette so output stays readable across
+// terminal themes.
 func applyDefaultStyles(h *charm.Logger) {
 	styles := charm.DefaultStyles()
 	styles.Levels[charm.DebugLevel] = styles.Levels[charm.DebugLevel].Foreground(lipgloss.Color("4"))

@@ -17,15 +17,15 @@
 // Example:
 //
 //	tp, err := telemetry.Setup(ctx, telemetry.Options{
-//	    ServiceName:    "finch-bot",
+//	    ServiceName:    "myapp",
 //	    ServiceVersion: build.Version(),
 //	    Exporter:       telemetry.ExporterStdout,
 //	})
 //	if err != nil { return err }
 //	defer tp.Shutdown(context.Background())
 //
-//	tracer := telemetry.Tracer("finch/bot")
-//	ctx, span := tracer.Start(ctx, "sync-releases")
+//	tracer := telemetry.Tracer("myapp/http")
+//	ctx, span := tracer.Start(ctx, "handle-request")
 //	defer span.End()
 package telemetry
 

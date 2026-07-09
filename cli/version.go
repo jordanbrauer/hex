@@ -12,7 +12,7 @@ import (
 // VersionOptions configures the version subcommand.
 type VersionOptions struct {
 	// App is a human-readable app name used in the one-line short output
-	// (e.g. "finch"). Falls back to the binary name if empty.
+	// (e.g. "myapp"). Falls back to the binary name if empty.
 	App string
 
 	// Long, when true, prints the multi-line build.Info block. When false
