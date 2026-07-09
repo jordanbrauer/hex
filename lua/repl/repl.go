@@ -404,14 +404,14 @@ func runInteractive(env *hexlua.Environment, session *teal.Session, defaultMode 
 		PromptColor:        lipgloss.Color("#000080"),
 	}
 
-	// Fennel mode: Lisp-flavoured Lua compiler. Prompt tinted the
-	// classic Clojure-ish blue-green.
+	// Fennel mode: Lisp-flavoured Lua compiler. Prompt in Fennel's
+	// signature cream (#fef3d7).
 	fennelMode := tuirepl.Mode{
 		Name:               "fennel",
 		Activator:          'f',
 		Prompt:             appName + "(fnl)> ",
 		ContinuationPrompt: appName + "(fnl). ",
-		PromptColor:        lipgloss.Color("#63b132"),
+		PromptColor:        lipgloss.Color("#fef3d7"),
 	}
 
 	// The FIRST mode in the slice is the default — what the user
