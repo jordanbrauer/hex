@@ -33,6 +33,8 @@ import (
 	"github.com/jordanbrauer/hex/config"
 	configlua "github.com/jordanbrauer/hex/config/lua"
 	"github.com/jordanbrauer/hex/container"
+	envlua "github.com/jordanbrauer/hex/env/lua"
+	eventslua "github.com/jordanbrauer/hex/events/lua"
 	loglua "github.com/jordanbrauer/hex/log/lua"
 	hexlua "github.com/jordanbrauer/hex/lua"
 	"github.com/jordanbrauer/hex/provider"
@@ -85,6 +87,8 @@ func (p *Provider) Register(app provider.Application) error {
 
 	p.installConfigModule(app)
 	p.installLogModule()
+	p.installEnvModule(app)
+	p.installEventsModule(app)
 
 	return nil
 }
@@ -103,6 +107,28 @@ func (p *Provider) installConfigModule(app provider.Application) {
 	bindings := &configlua.Bindings{Store: store}
 
 	p.env.PreloadModule("config", func(L *glua.LState) int {
+		return bindings.Loader(L)
+	})
+}
+
+// installEnvModule preloads the 'env' Lua module. The current
+// environment is captured from app.Environment() at install time.
+func (p *Provider) installEnvModule(app provider.Application) {
+	bindings := &envlua.Bindings{Environment: app.Environment()}
+
+	p.env.PreloadModule("env", func(L *glua.LState) int {
+		return bindings.Loader(L)
+	})
+}
+
+// installEventsModule preloads the 'events' Lua module. Uses the
+// provider.Application itself as the emitter — it forwards to the
+// app's events.Bus, so Lua-emitted events reach Go subscribers
+// registered via app.On.
+func (p *Provider) installEventsModule(app provider.Application) {
+	bindings := &eventslua.Bindings{Emitter: app}
+
+	p.env.PreloadModule("events", func(L *glua.LState) int {
 		return bindings.Loader(L)
 	})
 }

@@ -10,9 +10,13 @@ package provider
 import (
 	"context"
 
+	glua "github.com/yuin/gopher-lua"
+
 	"github.com/jordanbrauer/hex/container"
+	hexlua "github.com/jordanbrauer/hex/lua"
 	"github.com/jordanbrauer/hex/provider"
 	"github.com/jordanbrauer/hex/queue"
+	queuelua "github.com/jordanbrauer/hex/queue/lua"
 	"github.com/jordanbrauer/hex/queue/memory"
 )
 
@@ -48,7 +52,25 @@ func (p *Provider) Register(app provider.Application) error {
 		return p.q, nil
 	})
 
+	p.installLuaModule(app)
+
 	return nil
+}
+
+// installLuaModule preloads the 'queue' Lua module against the
+// shared *hex/lua.Environment when one is bound. Silent no-op
+// otherwise — hex/queue is usable without Lua.
+func (p *Provider) installLuaModule(app provider.Application) {
+	env, err := container.Make[*hexlua.Environment](app, "lua")
+	if err != nil || env == nil {
+		return
+	}
+
+	bindings := &queuelua.Bindings{Queue: p.q}
+
+	env.PreloadModule("queue", func(L *glua.LState) int {
+		return bindings.Loader(L)
+	})
 }
 
 // Shutdown closes the queue (drains subscribers, waits for in-flight
