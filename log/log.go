@@ -16,6 +16,7 @@
 package log
 
 import (
+	"io"
 	"log/slog"
 	"os"
 	"sync/atomic"
@@ -137,6 +138,18 @@ func Init(opts ...Option) {
 // this follows them — the whole point of routing through slog is that
 // downstream code can redirect logs without knowing about hex/log.
 func Handler() slog.Handler { return slog.Default().Handler() }
+
+// SetOutput redirects hex's charmbracelet handler to write to w.
+// Applies globally — subsequent log calls from anywhere in the
+// process go to w until the next SetOutput call.
+//
+// The REPL uses this per-eval to capture log output into scrollback
+// instead of writing to os.Stderr behind Bubble Tea's back. General
+// consumers can point logs at a file, buffer, or io.MultiWriter.
+//
+// No-op if a consumer has swapped slog.Default externally to a
+// non-charm handler; redirect via that handler's own API instead.
+func SetOutput(w io.Writer) { handler().SetOutput(w) }
 
 // Logger returns slog.Default(). Handy for callers wanting to hold
 // onto a logger reference, use With/WithGroup, or pass to libraries
