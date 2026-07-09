@@ -347,23 +347,19 @@ func runInteractive(env *hexlua.Environment, session *teal.Session, isTeal bool,
 		modes = []tuirepl.Mode{luaMode, tealMode}
 	}
 
-	// Force colors for log output. Two places check TTY status and
-	// strip colors if they see a non-TTY writer:
+	// The interactive REPL is TTY-gated at entry (isatty on
+	// os.Stdin), so we KNOW the terminal supports color. Force a
+	// rich profile on both renderers so log output rendered
+	// through a strings.Builder still carries ANSI codes.
 	//
-	//   1. The lipgloss default Renderer, which every style built
-	//      via lipgloss.NewStyle() shares. charm.DefaultStyles()
-	//      uses that renderer, so its Level styles pick up its
-	//      profile. We force the whole default renderer to the
-	//      terminal's real capabilities.
-	//
-	//   2. The charm.Logger's internal renderer (used for building
-	//      its own formatted output). We force this too via
-	//      hexlog.SetColorProfile.
-	//
-	// Without both, per-eval SetOutput swaps to strings.Builder
-	// would produce plain-text logs even though the terminal
-	// supports color.
+	// Prefers the env-detected profile when it's better than
+	// Ascii; falls back to ANSI256 when detection reports Ascii
+	// (common inside pipes / non-tty go stdlib checks).
 	profile := termenv.NewOutput(os.Stdout).EnvColorProfile()
+	if profile == termenv.Ascii {
+		profile = termenv.ANSI256
+	}
+
 	lipgloss.SetColorProfile(profile)
 	hexlog.SetColorProfile(profile)
 
