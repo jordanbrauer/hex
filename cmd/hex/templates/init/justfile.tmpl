@@ -19,7 +19,7 @@ build:
 # Build the frontend assets (CSS, {{ if .FrontendTS }}TypeScript, {{ end }}vendored libs).
 build-fe:
 {{- if .FrontendTS }}
-    pnpm exec mix --production
+    pnpm exec vite build
 {{- else }}
     just sync-fe
     pnpm exec tailwindcss -i ./resources/css/app.css -o ./public/css/app.css --minify
@@ -63,18 +63,18 @@ install-fe:
 # Watch + rebuild frontend assets on change (Ctrl+C to stop).
 dev-fe:
 {{- if .FrontendTS }}
-    pnpm exec mix watch
+    pnpm exec vite build --watch
 {{- else }}
     just sync-fe
     pnpm exec tailwindcss -i ./resources/css/app.css -o ./public/css/app.css --watch
 {{- end }}
 
 # Copy vendored htmx + alpine from node_modules into public/vendor/.
-# In TS mode, laravel-mix handles this during build/watch, so this
-# recipe is only meaningful in JS mode.
+# In TS mode vite bundles htmx + alpine into public/js/app.js, so
+# this recipe is only meaningful in JS mode.
 sync-fe:
 {{- if .FrontendTS }}
-    @echo "sync-fe is a no-op in TS mode; use \`just build-fe\` or \`just dev-fe\`"
+    @echo "sync-fe is a no-op in TS mode; htmx + alpine are bundled by vite into /js/app.js"
 {{- else }}
     pnpm exec cpy 'node_modules/htmx.org/dist/htmx.min.js' 'node_modules/alpinejs/dist/cdn.min.js' public/vendor/ --flat
 {{- end }}

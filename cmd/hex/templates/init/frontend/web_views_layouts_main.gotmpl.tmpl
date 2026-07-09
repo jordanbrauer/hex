@@ -6,11 +6,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{`{{ .Title }}`}}</title>
     <link rel="stylesheet" href="/css/app.css">
+{{- if .FrontendTS }}
+    <script type="module" src="/js/app.js" defer></script>
+{{- else }}
     <script src="/vendor/htmx.min.js" defer></script>
     <script src="/vendor/cdn.min.js" defer></script>
-{{- if .FrontendTS }}
-    <script src="/js/app.js" defer></script>
-{{- else }}
     <script src="/js/app.js" defer></script>
 {{- end }}
 </head>

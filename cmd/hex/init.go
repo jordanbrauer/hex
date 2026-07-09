@@ -615,7 +615,6 @@ func frontendFiles(cfg initConfig) []fileSpec {
 	specs := []fileSpec{
 		{base + "/package.json.tmpl", filepath.Join(dir, "package.json")},
 		{base + "/biome.json.tmpl", filepath.Join(dir, "biome.json")},
-		{base + "/tailwind.config.js.tmpl", filepath.Join(dir, "tailwind.config.js")},
 		{base + "/vitest.config.js.tmpl", filepath.Join(dir, "vitest.config.js")},
 
 		{base + "/resources_css_app.css.tmpl", filepath.Join(dir, "resources", "css", "app.css")},
@@ -630,7 +629,7 @@ func frontendFiles(cfg initConfig) []fileSpec {
 	if cfg.FrontendTS() {
 		specs = append(specs,
 			fileSpec{base + "/tsconfig.json.tmpl", filepath.Join(dir, "tsconfig.json")},
-			fileSpec{base + "/webpack.mix.js.tmpl", filepath.Join(dir, "webpack.mix.js")},
+			fileSpec{base + "/vite.config.js.tmpl", filepath.Join(dir, "vite.config.js")},
 			fileSpec{base + "/resources_js_app.ts.tmpl", filepath.Join(dir, "resources", "js", "app.ts")},
 		)
 	} else {
