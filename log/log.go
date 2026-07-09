@@ -23,6 +23,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	charm "github.com/charmbracelet/log"
+	"github.com/muesli/termenv"
 )
 
 // Level is Go's standard log/slog level type. Aliased so consumers can
@@ -150,6 +151,18 @@ func Handler() slog.Handler { return slog.Default().Handler() }
 // No-op if a consumer has swapped slog.Default externally to a
 // non-charm handler; redirect via that handler's own API instead.
 func SetOutput(w io.Writer) { handler().SetOutput(w) }
+
+// SetColorProfile locks the charm handler's ANSI color profile.
+// Overrides the TTY-detection heuristic that would otherwise strip
+// colors when writing to a non-terminal (buffer, pipe, file).
+//
+// The REPL uses this so log output rendered through Bubble Tea's
+// scrollback keeps its colors even though the underlying writer
+// (a strings.Builder) looks like a non-TTY to termenv.
+//
+// termenv.Ascii, ANSI, ANSI256, TrueColor for gradually richer
+// palettes. Pass termenv.EnvColorProfile() to honour $TERM / $COLORTERM.
+func SetColorProfile(profile termenv.Profile) { handler().SetColorProfile(profile) }
 
 // Logger returns slog.Default(). Handy for callers wanting to hold
 // onto a logger reference, use With/WithGroup, or pass to libraries

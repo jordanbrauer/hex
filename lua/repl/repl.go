@@ -26,6 +26,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/termenv"
 	lua "github.com/yuin/gopher-lua"
 
 	hexlog "github.com/jordanbrauer/hex/log"
@@ -345,6 +346,12 @@ func runInteractive(env *hexlua.Environment, session *teal.Session, isTeal bool,
 	} else {
 		modes = []tuirepl.Mode{luaMode, tealMode}
 	}
+
+	// Lock the log handler's color profile to whatever the real
+	// stdout supports. Otherwise the per-eval SetOutput swap to a
+	// strings.Builder would trip termenv's TTY heuristic and strip
+	// colors from log lines rendered in scrollback.
+	hexlog.SetColorProfile(termenv.NewOutput(os.Stdout).EnvColorProfile())
 
 	model := tuirepl.New(tuirepl.Options{
 		Banner:       banner,
