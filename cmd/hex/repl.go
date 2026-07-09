@@ -12,6 +12,7 @@ import (
 	lua "github.com/yuin/gopher-lua"
 
 	hexlua "github.com/jordanbrauer/hex/lua"
+	"github.com/jordanbrauer/hex/lua/teal"
 )
 
 func newReplCommand() *cobra.Command {
@@ -55,7 +56,31 @@ func runRepl(in io.Reader, out, errOut io.Writer, isTeal bool) error {
 		mode = "lua"
 	}
 
+	// For Teal mode: initialise a persistent Teal env so declarations
+	// on one line remain visible on subsequent lines. Non-REPL
+	// contexts (hex run script.tl) intentionally get isolated chunk
+	// semantics; the REPL is the exception.
+	var tealSession *teal.Session
+
+	if isTeal {
+		if err := teal.Load(env.L); err != nil {
+			return fmt.Errorf("repl: load teal: %w", err)
+		}
+
+		session, err := teal.NewSession(env.L)
+		if err != nil {
+			return fmt.Errorf("repl: teal session: %w", err)
+		}
+
+		tealSession = session
+	}
+
 	fmt.Fprintf(out, "hex repl — %s mode. Ctrl+D or \"exit\" to quit.\n", mode)
+
+	if isTeal {
+		fmt.Fprintln(out, "note: Teal forbids implicit globals. Use `global x: T = v` to declare persistent variables;")
+		fmt.Fprintln(out, "      locals do not carry across REPL lines. Use `--lua` for looser Lua semantics.")
+	}
 
 	prompt := "hex(" + mode + ")> "
 
@@ -86,8 +111,16 @@ func runRepl(in io.Reader, out, errOut io.Writer, isTeal bool) error {
 			continue
 		}
 
-		if err := evalLine(env, out, line, isTeal); err != nil {
-			fmt.Fprintln(errOut, "error:", trimTraceback(err.Error()))
+		if err := evalLine(env, out, line, isTeal, tealSession); err != nil {
+			msg := trimTraceback(err.Error())
+			fmt.Fprintln(errOut, "error:", msg)
+
+			// Teal-specific hint for the most common REPL confusion:
+			// `foo = 12` in Teal errors as "unknown variable: foo".
+			// Point the user at the fix.
+			if isTeal && strings.Contains(msg, "unknown variable") {
+				fmt.Fprintln(errOut, "hint: prefix with `global` to declare, e.g. `global foo: number = 12`")
+			}
 		}
 	}
 }
@@ -108,21 +141,39 @@ func isExitDirective(line string) bool {
 // and falls back to a statement form when the expression fails to
 // compile. Print top-of-stack when the expression form succeeds and
 // yielded a non-nil value.
-func evalLine(env *hexlua.Environment, out io.Writer, line string, isTeal bool) error {
+//
+// When session is non-nil, Teal compilation uses the persistent env
+// so declarations carry over across REPL lines.
+func evalLine(env *hexlua.Environment, out io.Writer, line string, isTeal bool, session *teal.Session) error {
 	// Expression form: prepend `return (` … `)` to capture the value.
 	wrapped := "return (" + line + ")"
 
-	if script, err := env.LoadString(wrapped, "<repl>", isTeal); err == nil {
+	if script, err := loadReplChunk(env, session, wrapped, isTeal); err == nil {
 		return execAndPrint(env, out, script)
 	}
 
 	// Fall back to statement.
-	script, err := env.LoadString(line, "<repl>", isTeal)
+	script, err := loadReplChunk(env, session, line, isTeal)
 	if err != nil {
 		return err
 	}
 
 	return env.Exec(script)
+}
+
+// loadReplChunk compiles a REPL line. When a Teal session is present,
+// uses its persistent env so prior declarations stay in scope.
+func loadReplChunk(env *hexlua.Environment, session *teal.Session, source string, isTeal bool) (*hexlua.Script, error) {
+	if !isTeal || session == nil {
+		return env.LoadString(source, "<repl>", isTeal)
+	}
+
+	luaSrc, err := session.Compile(source, "<repl>")
+	if err != nil {
+		return nil, err
+	}
+
+	return hexlua.Compile(luaSrc, "<repl>")
 }
 
 // execAndPrint runs the compiled expression and prints its result if

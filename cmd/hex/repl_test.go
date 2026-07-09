@@ -112,6 +112,47 @@ func TestRepl_tealModeEvaluatesTypedExpressions(t *testing.T) {
 	}
 }
 
+func TestRepl_tealSessionPersistsGlobals(t *testing.T) {
+	// Declaring a Teal global on one line should carry over the type
+	// info + runtime value to the next line via the persistent session
+	// env. Locals still don't carry across (Lua chunk semantics), but
+	// `global x: T = v` should work.
+	in := strings.NewReader("global bar: number = 12\nbar * bar\nexit\n")
+	var out, errOut bytes.Buffer
+
+	if err := runRepl(in, &out, &errOut, true); err != nil {
+		t.Fatalf("runRepl teal: %v", err)
+	}
+
+	if !strings.Contains(out.String(), "144") {
+		t.Errorf("expected 144 in output, got:\n%s", out.String())
+	}
+
+	if errOut.Len() > 0 {
+		t.Errorf("stderr should be empty on happy path, got:\n%s", errOut.String())
+	}
+}
+
+func TestRepl_tealImplicitGlobalHint(t *testing.T) {
+	// Teal forbids implicit globals. When the user writes `foo = 12`
+	// without a prior `global foo` declaration, we surface Teal's
+	// error message and a friendly hint about the fix.
+	in := strings.NewReader("bar = 12\nexit\n")
+	var out, errOut bytes.Buffer
+
+	if err := runRepl(in, &out, &errOut, true); err != nil {
+		t.Fatalf("runRepl teal: %v", err)
+	}
+
+	if !strings.Contains(errOut.String(), "unknown variable") {
+		t.Errorf("expected 'unknown variable' error, got:\n%s", errOut.String())
+	}
+
+	if !strings.Contains(errOut.String(), "global") {
+		t.Errorf("expected `global` hint on stderr, got:\n%s", errOut.String())
+	}
+}
+
 func TestTrimTraceback(t *testing.T) {
 	in := `some error\nstack traceback:\n\t[G]: in ?`
 	// Passing literal `\n` above — replace so this reflects an actual multiline string.
