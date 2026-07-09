@@ -92,10 +92,14 @@ jobs:
       - name: test (race + coverage)
         run: go test -race -covermode=atomic -coverprofile=coverage.txt ./...
 
+      # Upload MUST succeed — losing visibility into coverage is a
+      # real regression. Codecov's threshold checks (see .codecov.yml)
+      # are informational and won't block a merge, so this doesn't
+      # gate on the coverage number, only on the upload itself.
       - name: Upload coverage to Codecov
         if: matrix.os == 'ubuntu-latest'
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage.txt
-          fail_ci_if_error: false
+          fail_ci_if_error: true
