@@ -157,6 +157,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Emit the banner on the first Update, once we know the program
 	// is running. Doing this here (rather than Init) means the tests
 	// see the banner in Echoes() without needing to Init the model.
+	//
+	// Each entry in initCmds must be sequenced with the response
+	// cmds so scrollback order is deterministic — tea.Batch runs
+	// its Cmds concurrently, which reorders the tea.Println
+	// messages arbitrarily.
 	var initCmds []tea.Cmd
 
 	if !m.bannerShown && m.banner != "" {
@@ -186,7 +191,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds := append(initCmds, tea.Println(echo))
 
 			if strings.TrimSpace(line) == "" {
-				return m, tea.Batch(cmds...)
+				return m, tea.Sequence(cmds...)
 			}
 
 			m.pushHistory(line)
@@ -211,17 +216,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				cmds = append(cmds, tea.Quit)
 			}
 
-			return m, tea.Batch(cmds...)
+			return m, tea.Sequence(cmds...)
 
 		case tea.KeyUp:
 			m.navigateHistory(-1)
 
-			return m, tea.Batch(initCmds...)
+			return m, tea.Sequence(initCmds...)
 
 		case tea.KeyDown:
 			m.navigateHistory(1)
 
-			return m, tea.Batch(initCmds...)
+			return m, tea.Sequence(initCmds...)
 		}
 	}
 
@@ -229,7 +234,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.input, cmd = m.input.Update(msg)
 
 	if len(initCmds) > 0 {
-		return m, tea.Batch(append(initCmds, cmd)...)
+		return m, tea.Sequence(append(initCmds, cmd)...)
 	}
 
 	return m, cmd
