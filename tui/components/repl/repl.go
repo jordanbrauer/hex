@@ -59,6 +59,36 @@ type Result struct {
 // juggling closures per mode.
 type Evaluator func(mode, line string) Result
 
+// Candidate is a single tab-completion suggestion.
+type Candidate struct {
+	// Text is the full text that should replace the range from
+	// PrefixStart to the cursor when this candidate is chosen.
+	Text string
+
+	// Display is an optional label shown in a completion popup.
+	// v1 doesn't render a popup; Text is used everywhere. Reserved
+	// for future use.
+	Display string
+
+	// Kind is an optional semantic tag ("function", "table",
+	// "module", ...). Currently informational only.
+	Kind string
+}
+
+// Completer produces tab-completion candidates for the given input.
+//
+//	input      the full current input line
+//	cursorPos  the byte position of the cursor within input
+//
+// Returns the candidates and the byte offset at which the current
+// prefix begins. The REPL replaces input[prefixStart:cursorPos]
+// with the chosen candidate's Text.
+//
+// Empty candidates means "no completion available here"; the Tab
+// key falls through to whatever textinput does with it (usually
+// nothing, since Tab is not a typing character).
+type Completer func(mode, input string, cursorPos int) (candidates []Candidate, prefixStart int)
+
 // Mode describes a REPL mode — a language or command surface the
 // user can switch to. Julia's REPL popularised this pattern with
 // `?` (help), `;` (shell), `]` (pkg); we generalise it: any rune
@@ -103,6 +133,11 @@ type Options struct {
 	// to Prompt (so continuation is visually indistinguishable
 	// unless the caller sets this to something like "... ").
 	ContinuationPrompt string
+
+	// Completer, when non-nil, is called on Tab to compute
+	// completions for the current input line. See Completer's
+	// godoc for the contract.
+	Completer Completer
 
 	// Banner is optional multi-line text printed above the first
 	// prompt. Newlines are respected.
@@ -152,6 +187,15 @@ type Model struct {
 	inContinuation     bool
 	continuationBuffer []string
 	fixedContinuation  string // used when singleMode
+
+	// Completion state — populated on the first Tab press, walked
+	// through on subsequent Tabs. Reset by any other key.
+	completer         Completer
+	completionActive  bool
+	completionCands   []Candidate
+	completionIdx     int
+	completionStart   int    // byte offset where the completion range begins
+	completionCurrent string // text currently occupying the completion range
 
 	// submissions records every line submitted to the evaluator
 	// (empty lines and exit directives excluded). Used by tests to
@@ -215,6 +259,8 @@ func New(opts Options) Model {
 		singleMode: len(opts.Modes) == 0,
 	}
 
+	m.completer = opts.Completer
+
 	if m.singleMode {
 		m.fixedPrompt = opts.Prompt
 		if m.fixedPrompt == "" {
@@ -265,6 +311,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		// Any key that isn't Tab / Shift+Tab breaks a completion
+		// cycle. Reset once here so downstream cases don't have to
+		// remember.
+		if msg.Type != tea.KeyTab && msg.Type != tea.KeyShiftTab {
+			m.resetCompletion()
+		}
+
 		switch msg.Type {
 		case tea.KeyCtrlC:
 			// Ctrl+C in continuation mode aborts the pending buffer
@@ -374,6 +427,30 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, tea.Sequence(initCmds...)
 				}
 			}
+
+		case tea.KeyTab:
+			if m.completer == nil {
+				break
+			}
+
+			if m.completionActive {
+				m.cycleCompletion(1)
+
+				return m, tea.Sequence(initCmds...)
+			}
+
+			m.beginCompletion()
+
+			return m, tea.Sequence(initCmds...)
+
+		case tea.KeyShiftTab:
+			if m.completer == nil || !m.completionActive {
+				break
+			}
+
+			m.cycleCompletion(-1)
+
+			return m, tea.Sequence(initCmds...)
 		}
 	}
 
@@ -440,6 +517,74 @@ func (m Model) CurrentMode() string { return m.currentModeName() }
 // InContinuation reports whether the REPL is currently waiting for
 // the user to finish a multi-line input.
 func (m Model) InContinuation() bool { return m.inContinuation }
+
+// beginCompletion runs the completer against the current input +
+// cursor and installs the first candidate (or the only candidate)
+// into the input line.
+func (m *Model) beginCompletion() {
+	if m.completer == nil {
+		return
+	}
+
+	value := m.input.Value()
+	cursor := m.input.Position()
+
+	candidates, prefixStart := m.completer(m.currentModeName(), value, cursor)
+	if len(candidates) == 0 {
+		return
+	}
+
+	m.completionActive = true
+	m.completionCands = candidates
+	m.completionIdx = 0
+	m.completionStart = prefixStart
+	m.completionCurrent = value[prefixStart:cursor]
+
+	m.applyCandidate(candidates[0].Text)
+
+	// Single candidate: no point cycling, drop cycle state so any
+	// future Tab starts a fresh completion.
+	if len(candidates) == 1 {
+		m.completionActive = false
+		m.completionCands = nil
+	}
+}
+
+// cycleCompletion advances (or reverses via delta=-1) through the
+// active candidate list, replacing the input's completion range.
+func (m *Model) cycleCompletion(delta int) {
+	if !m.completionActive || len(m.completionCands) == 0 {
+		return
+	}
+
+	m.completionIdx = (m.completionIdx + delta + len(m.completionCands)) % len(m.completionCands)
+	m.applyCandidate(m.completionCands[m.completionIdx].Text)
+}
+
+// applyCandidate replaces the current completion range in the input
+// with cand and moves the cursor to the end of the inserted text.
+// Uses completionCurrent to know exactly what text to strip, so
+// cycling replaces the previous candidate rather than the original
+// prefix.
+func (m *Model) applyCandidate(cand string) {
+	value := m.input.Value()
+	prefix := value[:m.completionStart]
+	suffix := value[m.completionStart+len(m.completionCurrent):]
+
+	m.input.SetValue(prefix + cand + suffix)
+	m.input.SetCursor(m.completionStart + len(cand))
+	m.completionCurrent = cand
+}
+
+// resetCompletion abandons any active completion cycle. Called on any
+// non-Tab key press.
+func (m *Model) resetCompletion() {
+	m.completionActive = false
+	m.completionCands = nil
+	m.completionIdx = 0
+	m.completionStart = 0
+	m.completionCurrent = ""
+}
 
 // pushHistory records line in the ring buffer, trimming the oldest
 // entry when HistoryLimit is exceeded.
