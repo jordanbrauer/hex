@@ -1,0 +1,40 @@
+{
+    "name": "{{.BinaryName}}",
+    "private": true,
+    "packageManager": "pnpm@9.15.0",
+    "scripts": {
+{{- if .FrontendTS }}
+        "dev": "mix watch",
+        "build": "mix --production",
+{{- else }}
+        "postinstall": "pnpm sync",
+        "sync": "cpy 'node_modules/htmx.org/dist/htmx.min.js' 'node_modules/alpinejs/dist/cdn.min.js' public/vendor/ --flat",
+        "dev": "concurrently -k -n css \"pnpm dev:css\"",
+        "dev:css": "tailwindcss -i ./resources/css/app.css -o ./public/css/app.css --watch",
+        "build": "pnpm sync && pnpm build:css",
+        "build:css": "tailwindcss -i ./resources/css/app.css -o ./public/css/app.css --minify",
+{{- end }}
+        "lint": "biome check .",
+        "format": "biome format --write .",
+        "test": "vitest"
+    },
+    "dependencies": {
+        "alpinejs": "^3.14.9",
+        "htmx.org": "^2.0.4"
+    },
+    "devDependencies": {
+        "@biomejs/biome": "^1.9.4",
+{{- if .FrontendTS }}
+        "@types/alpinejs": "^3.13.11",
+        "laravel-mix": "^6.0.49",
+        "postcss": "^8.4.49",
+        "tailwindcss": "^4.0.0",
+        "typescript": "^5.7.2",
+{{- else }}
+        "concurrently": "^9.1.0",
+        "cpy-cli": "^5.0.0",
+        "tailwindcss": "^4.0.0",
+{{- end }}
+        "vitest": "^2.1.8"
+    }
+}

@@ -1,0 +1,14 @@
+import { defineConfig } from "vitest/config";
+
+export default defineConfig({
+    test: {
+        include: [
+{{- if .FrontendTS }}
+            "resources/**/*.test.{ts,tsx}",
+{{- else }}
+            "public/**/*.test.js",
+            "resources/**/*.test.js",
+{{- end }}
+        ],
+    },
+});

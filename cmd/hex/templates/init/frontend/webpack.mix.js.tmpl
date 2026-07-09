@@ -1,0 +1,16 @@
+const mix = require("laravel-mix");
+
+// TypeScript bundle for the app.
+mix.ts("resources/js/app.ts", "public/js");
+
+// Tailwind CSS pipeline.
+mix.postCss("resources/css/app.css", "public/css", [
+    require("tailwindcss"),
+]);
+
+// Copy vendored htmx + alpine into public/vendor so the layout can
+// reference /vendor/*.min.js without exposing node_modules.
+mix.copy("node_modules/htmx.org/dist/htmx.min.js", "public/vendor/");
+mix.copy("node_modules/alpinejs/dist/cdn.min.js", "public/vendor/");
+
+mix.options({ hmrOptions: { host: "localhost", port: 8181 } });

@@ -1,0 +1,12 @@
+// Application-owned JS. htmx and alpine are loaded from
+// /vendor/*.min.js by web/views/layouts/main.gotmpl.
+//
+// Any custom behaviour goes here — extra Alpine directives, HTMX
+// event listeners, keyboard shortcuts, etc.
+
+document.addEventListener("DOMContentLoaded", () => {
+    // Example: log every HTMX request in dev.
+    document.body.addEventListener("htmx:beforeRequest", (event) => {
+        console.debug("htmx →", event.detail.requestConfig?.path);
+    });
+});
