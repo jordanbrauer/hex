@@ -25,12 +25,21 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
+// Preprocessor converts arbitrary template source (e.g. Jade/Pug,
+// Markdown) to html/template-compatible source before the Engine
+// parses it. name is the template's path relative to the view root
+// (useful for error messages); source is the raw file contents.
+//
+// Return the html/template string plus any error. A nil error with
+// an empty string is treated as "skip this template".
+type Preprocessor func(name string, source []byte) (string, error)
+
 // Engine holds a parsed template set + optional per-render helpers.
 type Engine struct {
 	tmpl *template.Template
 	fsys fs.FS
 	dir  string
-	ext  string
+	exts map[string]Preprocessor
 }
 
 // Option configures a new Engine.
@@ -38,7 +47,7 @@ type Option func(*config)
 
 type config struct {
 	funcs template.FuncMap
-	ext   string
+	exts  map[string]Preprocessor
 	dir   string
 }
 
@@ -47,10 +56,48 @@ func WithFuncs(funcs template.FuncMap) Option {
 	return func(c *config) { c.funcs = funcs }
 }
 
-// WithExtension sets the template file extension the loader scans for.
-// Defaults to ".gotmpl".
+// WithExtension registers a template file extension. Files ending
+// with ext are loaded and parsed as plain html/template source.
+// Call multiple times to accept several extensions; call
+// WithPreprocessor instead for extensions that need translation
+// (Jade/Pug, Markdown, ...).
+//
+// The default engine accepts ".gotmpl" only.
 func WithExtension(ext string) Option {
-	return func(c *config) { c.ext = ext }
+	return func(c *config) {
+		if ext == "" {
+			return
+		}
+
+		if c.exts == nil {
+			c.exts = map[string]Preprocessor{}
+		}
+
+		c.exts[ext] = nil // no preprocessor — raw html/template
+	}
+}
+
+// WithPreprocessor registers a Preprocessor for files matching ext.
+// The preprocessor's output is fed to html/template. Useful for:
+//
+//   - Jade/Pug (github.com/Joker/jade) via hex/view/jade
+//   - Markdown via any markdown-to-html transformer
+//   - Mustache-like DSLs that need translation
+//
+// Multiple extensions with different preprocessors can coexist —
+// call WithPreprocessor once per extension.
+func WithPreprocessor(ext string, fn Preprocessor) Option {
+	return func(c *config) {
+		if ext == "" || fn == nil {
+			return
+		}
+
+		if c.exts == nil {
+			c.exts = map[string]Preprocessor{}
+		}
+
+		c.exts[ext] = fn
+	}
 }
 
 // WithDir sets the subdirectory within the FS to scan. Defaults to the
@@ -65,9 +112,17 @@ func WithDir(dir string) Option {
 // `web/views/pages/home.gotmpl` (with fsys rooted at `web/views/`)
 // registers as `pages/home`.
 func New(fsys fs.FS, opts ...Option) (*Engine, error) {
-	cfg := config{ext: ".gotmpl"}
+	cfg := config{}
 	for _, opt := range opts {
 		opt(&cfg)
+	}
+
+	// Default extension: .gotmpl (raw html/template). Users who
+	// only register a different extension get just that; to keep
+	// .gotmpl alongside another, call WithExtension(".gotmpl")
+	// explicitly alongside your WithPreprocessor(...).
+	if len(cfg.exts) == 0 {
+		cfg.exts = map[string]Preprocessor{".gotmpl": nil}
 	}
 
 	if fsys == nil {
@@ -89,7 +144,12 @@ func New(fsys fs.FS, opts ...Option) (*Engine, error) {
 			return walkErr
 		}
 
-		if d.IsDir() || !strings.HasSuffix(p, cfg.ext) {
+		if d.IsDir() {
+			return nil
+		}
+
+		ext, preprocessor, ok := matchExtension(p, cfg.exts)
+		if !ok {
 			return nil
 		}
 
@@ -101,9 +161,24 @@ func New(fsys fs.FS, opts ...Option) (*Engine, error) {
 		rel := strings.TrimPrefix(p, scanDir)
 		rel = strings.TrimPrefix(rel, "/")
 
-		name := strings.TrimSuffix(rel, cfg.ext)
+		name := strings.TrimSuffix(rel, ext)
 
-		if _, parseErr := root.New(name).Parse(string(data)); parseErr != nil {
+		source := string(data)
+
+		if preprocessor != nil {
+			converted, ppErr := preprocessor(name, data)
+			if ppErr != nil {
+				return fmt.Errorf("view: preprocess %s: %w", p, ppErr)
+			}
+
+			if converted == "" {
+				return nil
+			}
+
+			source = converted
+		}
+
+		if _, parseErr := root.New(name).Parse(source); parseErr != nil {
 			return fmt.Errorf("view: parse %s: %w", p, parseErr)
 		}
 
@@ -119,8 +194,27 @@ func New(fsys fs.FS, opts ...Option) (*Engine, error) {
 		tmpl: root,
 		fsys: fsys,
 		dir:  scanDir,
-		ext:  cfg.ext,
+		exts: cfg.exts,
 	}, nil
+}
+
+// matchExtension picks the longest matching extension from exts for
+// path p and returns it along with its preprocessor. Longest-match
+// so ".html.jade" beats ".jade" when both are registered.
+func matchExtension(p string, exts map[string]Preprocessor) (string, Preprocessor, bool) {
+	var (
+		best string
+		fn   Preprocessor
+	)
+
+	for ext, pp := range exts {
+		if strings.HasSuffix(p, ext) && len(ext) > len(best) {
+			best = ext
+			fn = pp
+		}
+	}
+
+	return best, fn, best != ""
 }
 
 // Render implements echo.Renderer. Consumers call:
