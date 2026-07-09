@@ -19,21 +19,14 @@ type adapterData struct {
 func newMakeAdapterCommand() *cobra.Command {
 	var (
 		dialect string
-		force   bool
+		flags   genFlags
 	)
 
 	cmd := &cobra.Command{
 		Use:   "make:adapter <domain>",
+		Args:  cobra.ExactArgs(1),
 		Short: "Generate an infrastructure adapter for a domain repository",
-		Long: `Create infrastructure/<dialect>/<domain>_repository.go — a stub
-implementation of domain/<domain>.Repository backed by the given SQL
-dialect.
-
-The generator produces panic("not implemented") stubs for the standard
-Repository methods (Store, Get, List, Delete) that make:domain scaffolds.
-If you have extended Repository with additional methods, add them by
-hand.`,
-		Args: cobra.ExactArgs(1),
+		Long:  helpLong("make_adapter"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, modulePath, err := projectRoot()
 			if err != nil {
@@ -58,15 +51,22 @@ hand.`,
 
 			target := filepath.Join(root, "infrastructure", dialect, data.Domain+"_repository.go")
 
-			g := newGenerator()
-			g.force = force
+			g, err := newGeneratorFromFlags(flags)
+			if err != nil {
+				return err
+			}
 
-			return g.render("templates/adapter.go.tmpl", target, data)
+			if err := g.render("templates/adapter.go.tmpl", target, data); err != nil {
+				return err
+			}
+
+			return g.report()
 		},
 	}
 
 	cmd.Flags().StringVar(&dialect, "dialect", "sqlite", "SQL dialect: sqlite or postgres")
-	cmd.Flags().BoolVar(&force, "force", false, "overwrite existing files")
+	setExample(cmd, "make_adapter")
+	addGeneratorFlags(cmd, &flags)
 
 	return cmd
 }

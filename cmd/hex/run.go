@@ -22,27 +22,8 @@ func newRunCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "run [file]",
 		Short: "Run a Lua, Teal, or Fennel script",
-		Long: `Run an arbitrary Lua (.lua), Teal (.tl), or Fennel (.fnl) script
-or inline code.
-
-Source can come from three places (mutually exclusive):
-
-  hex run script.lua                  # a file (extension picks the language)
-  hex run script.tl
-  hex run script.fnl
-  hex run -                           # stdin (--lang selects; default lua)
-  hex run -c 'print("hi")'            # inline Lua source
-  hex run -c '(print "hi")' --lang fnl # inline Fennel
-
-Use --check to validate without executing. For .tl files this runs
-the Teal type-checker; for .fnl files this runs the Fennel
-compiler as a syntax check; for .lua files, the Lua parser.
-
-The runtime is bare gopher-lua + the requested compiler; no hex
-modules (agent, db, etc.) are pre-registered. For app-scoped script
-execution with access to registered modules, use the "repl"
-command on your scaffolded app or add a subcommand there.`,
-		Args: cobra.MaximumNArgs(1),
+		Long:  helpLong("run"),
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			forced, err := parseLangFlag(langFlag)
 			if err != nil {
@@ -73,6 +54,7 @@ command on your scaffolded app or add a subcommand there.`,
 	cmd.Flags().StringVarP(&code, "code", "c", "", "inline source code (mutually exclusive with a file arg)")
 	cmd.Flags().BoolVar(&check, "check", false, "validate syntax/types without executing")
 	cmd.Flags().StringVar(&langFlag, "lang", "", "force language for inline/stdin source: lua, teal, fennel (irrelevant for file args)")
+	setExample(cmd, "run")
 
 	return cmd
 }

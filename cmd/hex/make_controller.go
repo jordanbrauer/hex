@@ -53,22 +53,14 @@ func newMakeControllerCommand() *cobra.Command {
 	var (
 		all     bool
 		actions string
-		force   bool
+		flags   genFlags
 	)
 
 	cmd := &cobra.Command{
 		Use:   "make:controller <name>",
+		Args:  cobra.ExactArgs(1),
 		Short: "Generate an HTTP controller",
-		Long: `Create an app/controller/<name>.go controller and wire routes into
-app/provider/routes.go before the ` + "`// hex:routes`" + ` marker.
-
-Default: a single Index handler with a GET /<name> route. Use --all
-to scaffold full RESTful CRUD (index/show/store/update/destroy) or
---actions to pick a subset (comma-separated).
-
-Requires --web to have been enabled at hex init so the Routes
-provider and app/controller/ package exist.`,
-		Args: cobra.ExactArgs(1),
+		Long:  helpLong("make_controller"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, modulePath, err := projectRoot()
 			if err != nil {
@@ -99,8 +91,10 @@ provider and app/controller/ package exist.`,
 			// 1. Scaffold app/controller/<name>.go.
 			target := filepath.Join(root, "app", "controller", pkg+".go")
 
-			g := newGenerator()
-			g.force = force
+			g, err := newGeneratorFromFlags(flags)
+			if err != nil {
+				return err
+			}
 
 			if err := g.render("templates/controller.go.tmpl", target, data); err != nil {
 				return err
@@ -108,17 +102,18 @@ provider and app/controller/ package exist.`,
 
 			// 2. Wire routes into app/provider/routes.go.
 			routesFile := filepath.Join(root, "app", "provider", "routes.go")
-			if err := wireControllerRoutes(routesFile, modulePath, data); err != nil {
+			if err := wireControllerRoutes(g, routesFile, modulePath, data); err != nil {
 				return err
 			}
 
-			return nil
+			return g.report()
 		},
 	}
 
 	cmd.Flags().BoolVar(&all, "all", false, "scaffold full RESTful CRUD (index/show/store/update/destroy)")
 	cmd.Flags().StringVar(&actions, "actions", "", "comma-separated list of actions (index,show,store,update,destroy)")
-	cmd.Flags().BoolVar(&force, "force", false, "overwrite existing files")
+	setExample(cmd, "make_controller")
+	addGeneratorFlags(cmd, &flags)
 
 	return cmd
 }
@@ -202,10 +197,10 @@ func actionRank(method string) int {
 // wireControllerRoutes converts the controller/<pkg> blank import in
 // routes.go into a non-blank one (if needed), then inserts the
 // route-registration lines above the hex:routes marker.
-func wireControllerRoutes(routesFile, modulePath string, data controllerData) error {
+func wireControllerRoutes(g *generator, routesFile, modulePath string, data controllerData) error {
 	// Promote blank controller import to a real one, once. Idempotent:
 	// no-op after the first controller is scaffolded.
-	if err := promoteBlankImport(routesFile, modulePath+"/app/controller"); err != nil {
+	if err := g.promoteImport(routesFile, modulePath+"/app/controller"); err != nil {
 		return err
 	}
 
@@ -217,11 +212,9 @@ func wireControllerRoutes(routesFile, modulePath string, data controllerData) er
 			methodCall(a.Verb), data.Path, a.Suffix, data.Variable, a.Method)
 	}
 
-	if err := insertBeforeMarker(routesFile, "// hex:routes", b.String()); err != nil {
+	if err := g.wireMarker(routesFile, "// hex:routes", b.String(), "added "+data.Struct); err != nil {
 		return fmt.Errorf("wire routes into %s: %w", routesFile, err)
 	}
-
-	fmt.Println("→", routesFile, "(added", data.Struct+")")
 
 	return nil
 }

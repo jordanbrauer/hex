@@ -30,21 +30,14 @@ type commandData struct {
 func newMakeCommandCommand() *cobra.Command {
 	var (
 		group string
-		force bool
+		flags genFlags
 	)
 
 	cmd := &cobra.Command{
 		Use:   "make:command <name>",
+		Args:  cobra.ExactArgs(1),
 		Short: "Generate a cobra command",
-		Long: `Create a new cobra command wired into the application.
-
-Without --group, the command lands at app/command/<name>.go and is
-registered against the root's hex:commands marker.
-
-With --group, the command lands at app/command/<group>/<name>.go and
-is registered against the group's hex:commands:<group> marker. The
-group's root.go is generated automatically if it does not exist yet.`,
-		Args: cobra.ExactArgs(1),
+		Long:  helpLong("make_command"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, modulePath, err := projectRoot()
 			if err != nil {
@@ -65,19 +58,26 @@ group's root.go is generated automatically if it does not exist yet.`,
 			}
 			data.GroupPackage = data.Group
 
-			g := newGenerator()
-			g.force = force
-
-			if data.Group == "" {
-				return makeTopLevelCommand(g, root, data)
+			g, err := newGeneratorFromFlags(flags)
+			if err != nil {
+				return err
 			}
 
-			return makeGroupCommand(g, root, data)
+			if data.Group == "" {
+				if err := makeTopLevelCommand(g, root, data); err != nil {
+					return err
+				}
+			} else if err := makeGroupCommand(g, root, data); err != nil {
+				return err
+			}
+
+			return g.report()
 		},
 	}
 
 	cmd.Flags().StringVar(&group, "group", "", "parent command group (creates a subcommand)")
-	cmd.Flags().BoolVar(&force, "force", false, "overwrite existing files")
+	setExample(cmd, "make_command")
+	addGeneratorFlags(cmd, &flags)
 
 	return cmd
 }
@@ -94,11 +94,9 @@ func makeTopLevelCommand(g *generator, root string, data commandData) error {
 	rootFile := filepath.Join(root, "app", "command", "root.go")
 	registration := fmt.Sprintf("%s(app),", data.FuncName)
 
-	if err := insertBeforeMarker(rootFile, "// hex:commands", registration); err != nil {
+	if err := g.wireMarker(rootFile, "// hex:commands", registration, "added "+data.FuncName); err != nil {
 		return fmt.Errorf("wire into %s: %w", rootFile, err)
 	}
-
-	fmt.Println("→", rootFile, "(added", data.FuncName+")")
 
 	return nil
 }
@@ -108,8 +106,8 @@ func makeTopLevelCommand(g *generator, root string, data commandData) error {
 func makeGroupCommand(g *generator, root string, data commandData) error {
 	groupDir := filepath.Join(root, "app", "command", data.Group)
 
-	if err := os.MkdirAll(groupDir, 0o755); err != nil {
-		return fmt.Errorf("mkdir %s: %w", groupDir, err)
+	if err := g.mkdirp(groupDir); err != nil {
+		return err
 	}
 
 	// Generate the group's root.go if not present. force does NOT apply
@@ -126,20 +124,14 @@ func makeGroupCommand(g *generator, root string, data commandData) error {
 		topRoot := filepath.Join(root, "app", "command", "root.go")
 		reg := fmt.Sprintf("%s.Root(app),", data.Group)
 
-		if err := insertBeforeMarker(topRoot, "// hex:commands", reg); err != nil {
+		if err := g.wireMarker(topRoot, "// hex:commands", reg, "added "+data.Group+".Root"); err != nil {
 			return fmt.Errorf("wire group into %s: %w", topRoot, err)
 		}
 
-		// Add the group's package import to root.go. Import is inserted
-		// above the closing `)` of the import block via a second marker
-		// convention: no marker required because Go's imports are stable
-		// enough to detect by string match. We use a simple approach:
-		// if the import is not present, add it above the last `)`.
-		if err := addImport(topRoot, data.ModulePath+"/app/command/"+data.Group); err != nil {
+		// Add the group's package import to root.go.
+		if err := g.wireImport(topRoot, data.ModulePath+"/app/command/"+data.Group); err != nil {
 			return fmt.Errorf("add import to %s: %w", topRoot, err)
 		}
-
-		fmt.Println("→", topRoot, "(added", data.Group+".Root)")
 	}
 
 	// Now the subcommand itself.
@@ -151,11 +143,9 @@ func makeGroupCommand(g *generator, root string, data commandData) error {
 	// Register the subcommand in the group's root.go.
 	registration := fmt.Sprintf("%s(app),", data.FuncName)
 
-	if err := insertBeforeMarker(groupRoot, "// hex:commands:"+data.Group, registration); err != nil {
+	if err := g.wireMarker(groupRoot, "// hex:commands:"+data.Group, registration, "added "+data.FuncName); err != nil {
 		return fmt.Errorf("wire into %s: %w", groupRoot, err)
 	}
-
-	fmt.Println("→", groupRoot, "(added", data.FuncName+")")
 
 	return nil
 }

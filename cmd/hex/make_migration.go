@@ -18,16 +18,13 @@ type migrationData struct {
 }
 
 func newMakeMigrationCommand() *cobra.Command {
-	var force bool
+	var flags genFlags
 
 	cmd := &cobra.Command{
 		Use:   "make:migration <name>",
+		Args:  cobra.ExactArgs(1),
 		Short: "Generate a timestamped SQL migration",
-		Long: "Create db/migrations/<timestamp>_<name>.{up,down}.sql\n\n" +
-			"The timestamp is in the format golang-migrate expects (yyyyMMddHHmmss),\n" +
-			"lexically sortable and unique to the second. Consumers can then edit the\n" +
-			"generated SQL to add their real schema.",
-		Args: cobra.ExactArgs(1),
+		Long:  helpLong("make_migration"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, _, err := projectRoot()
 			if err != nil {
@@ -53,8 +50,10 @@ func newMakeMigrationCommand() *cobra.Command {
 				{"templates/migration.down.sql.tmpl", filepath.Join(dir, base+".down.sql")},
 			}
 
-			g := newGenerator()
-			g.force = force
+			g, err := newGeneratorFromFlags(flags)
+			if err != nil {
+				return err
+			}
 
 			for _, f := range files {
 				if err := g.render(f.tpl, f.target, data); err != nil {
@@ -62,11 +61,12 @@ func newMakeMigrationCommand() *cobra.Command {
 				}
 			}
 
-			return nil
+			return g.report()
 		},
 	}
 
-	cmd.Flags().BoolVar(&force, "force", false, "overwrite existing files")
+	setExample(cmd, "make_migration")
+	addGeneratorFlags(cmd, &flags)
 
 	return cmd
 }

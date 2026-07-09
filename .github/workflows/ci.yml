@@ -47,6 +47,34 @@ jobs:
         with:
           version: v2.12.2
 
+  # docs: the generated manpage markdown (docs/man/hex.{1,3}.md) must stay
+  # in sync with the command tree, help files, and Lua type stubs. This is
+  # pure Go — no pandoc needed (the roff render happens at release time),
+  # so the check is not sensitive to a pandoc version. Fails if `gen-man`
+  # would change a committed source.
+  docs:
+    name: docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: regenerate manpage markdown
+        run: go run ./cmd/hex gen-man
+
+      - name: check for drift
+        run: |
+          if ! git diff --quiet -- docs/man; then
+            echo "Generated manpage markdown is stale."
+            echo "Run 'just man' (or 'go run ./cmd/hex gen-man') and commit docs/man/*.md."
+            git diff -- docs/man
+            exit 1
+          fi
+
   # build: compile every package. Runs in parallel with qa.
   build:
     name: build

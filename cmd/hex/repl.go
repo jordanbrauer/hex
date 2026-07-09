@@ -16,29 +16,8 @@ func newReplCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "repl",
 		Short: "Interactive Teal / Lua / Fennel REPL",
-		Long: `Launch an interactive REPL that evaluates Teal by default.
-Use --mode to start in a different language:
-
-  hex repl              # Teal (default)
-  hex repl --mode lua   # Lua
-  hex repl --mode fnl   # Fennel
-
-In interactive mode, switch languages on the fly at an empty prompt:
-
-  t   → Teal    (color: #3e8b9b)
-  l   → Lua     (color: #000080)
-  f   → Fennel  (color: #63b132)
-
-Backspace on an empty prompt in a non-default mode returns to the
-language you launched with.
-
-The runtime is bare gopher-lua + the requested compiler; no hex
-modules are pre-loaded. Scaffolded apps get a container-aware REPL
-via "<appname> repl" — that one has access to db, cache, config,
-and whatever the app registers.
-
-Exit with Ctrl+D, "exit", or "quit".`,
-		Args: cobra.NoArgs,
+		Long:  helpLong("repl"),
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			mode, err := parseReplMode(modeFlag)
 			if err != nil {
@@ -57,6 +36,7 @@ Exit with Ctrl+D, "exit", or "quit".`,
 	}
 
 	cmd.Flags().StringVar(&modeFlag, "mode", "", "starting language: teal (default), lua, fennel")
+	setExample(cmd, "repl")
 
 	return cmd
 }

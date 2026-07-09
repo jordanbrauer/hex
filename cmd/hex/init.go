@@ -95,17 +95,14 @@ func newInitCommand() *cobra.Command {
 		aiFlag      string
 		frontend    string
 		yes         bool
-		force       bool
+		flags       genFlags
 	)
 
 	cmd := &cobra.Command{
 		Use:   "init [name]",
 		Short: "Scaffold a new hex project",
-		Long: "Create a new hex application in the given directory (or the current one).\n" +
-			"Run without a name to scaffold into `.`; otherwise a subdirectory is created.\n\n" +
-			"Interactive prompts fill in the module path, binary name, and which framework\n" +
-			"components to enable. Pass --yes to skip prompts and use flag defaults.",
-		Args: cobra.MaximumNArgs(1),
+		Long:  helpLong("init"),
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := resolveInitConfig(args, resolveFlags{
 				module:      modulePath,
@@ -126,11 +123,22 @@ func newInitCommand() *cobra.Command {
 				return err
 			}
 
-			if err := scaffold(cfg, force); err != nil {
+			g, err := newGeneratorFromFlags(flags)
+			if err != nil {
 				return err
 			}
 
-			printInitSuccess(cfg)
+			if err := scaffold(g, cfg); err != nil {
+				return err
+			}
+
+			if err := g.report(); err != nil {
+				return err
+			}
+
+			if g.format != "json" && !g.dryRun {
+				printInitSuccess(cfg)
+			}
 
 			return nil
 		},
@@ -149,7 +157,8 @@ func newInitCommand() *cobra.Command {
 	cmd.Flags().StringVar(&aiFlag, "ai", "none", "AI provider: openai, anthropic, none")
 	cmd.Flags().StringVar(&frontend, "frontend", "none", "frontend stack: js (no build), ts (Laravel Mix), none (default)")
 	cmd.Flags().BoolVar(&yes, "yes", false, "skip interactive prompts, use flag defaults")
-	cmd.Flags().BoolVar(&force, "force", false, "overwrite existing files")
+	setExample(cmd, "init")
+	addGeneratorFlags(cmd, &flags)
 
 	return cmd
 }
@@ -434,20 +443,18 @@ func (c initConfig) validate() error {
 	return nil
 }
 
-// scaffold materialises the project files at cfg.Directory.
-func scaffold(cfg initConfig, force bool) error {
-	if err := os.MkdirAll(cfg.Directory, 0o755); err != nil {
-		return fmt.Errorf("mkdir %s: %w", cfg.Directory, err)
-	}
-
-	if !force {
+// scaffold materialises the project files at cfg.Directory using the
+// configured generator (honouring its dry-run / force / output settings).
+func scaffold(g *generator, cfg initConfig) error {
+	if !g.force {
 		if _, err := os.Stat(filepath.Join(cfg.Directory, "go.mod")); err == nil {
 			return fmt.Errorf("%s already contains a go.mod (use --force to overwrite)", cfg.Directory)
 		}
 	}
 
-	g := newGenerator()
-	g.force = force
+	if err := g.mkdirp(cfg.Directory); err != nil {
+		return err
+	}
 
 	files := coreFiles(cfg)
 
@@ -513,11 +520,16 @@ func scaffold(cfg initConfig, force bool) error {
 	}
 
 	for _, d := range dirs {
-		if err := os.MkdirAll(d, 0o755); err != nil {
+		if err := g.mkdirp(d); err != nil {
 			return err
 		}
 
-		if err := writeIfMissing(filepath.Join(d, ".gitkeep"), nil); err != nil {
+		keep := filepath.Join(d, ".gitkeep")
+		if _, err := os.Stat(keep); err == nil {
+			continue
+		}
+
+		if err := g.write(keep, []byte{}); err != nil {
 			return err
 		}
 	}
@@ -550,6 +562,7 @@ func coreFiles(cfg initConfig) []fileSpec {
 		{"templates/init/gitignore.tmpl", filepath.Join(cfg.Directory, ".gitignore")},
 		{"templates/init/env.dist.tmpl", filepath.Join(cfg.Directory, ".env.dist")},
 		{"templates/init/README.md.tmpl", filepath.Join(cfg.Directory, "README.md")},
+		{"templates/init/AGENTS.md.tmpl", filepath.Join(cfg.Directory, "AGENTS.md")},
 		{"templates/init/go.mod.tmpl", filepath.Join(cfg.Directory, "go.mod")},
 		{"templates/init/air.toml.tmpl", filepath.Join(cfg.Directory, ".air.toml")},
 	}
@@ -701,18 +714,6 @@ func componentFiles(name string, cfg initConfig) []fileSpec {
 	}
 
 	return specs
-}
-
-func writeIfMissing(path string, content []byte) error {
-	if _, err := os.Stat(path); err == nil {
-		return nil
-	}
-
-	if content == nil {
-		content = []byte{}
-	}
-
-	return os.WriteFile(path, content, 0o644)
 }
 
 func printInitSuccess(cfg initConfig) {
