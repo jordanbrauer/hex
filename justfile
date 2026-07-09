@@ -42,14 +42,16 @@ lint: fmt-check man-check
 fmt:
     gofmt -s -w .
 
-# Verify formatting is clean; fail if anything would change.
+# Verify formatting is clean; fail if anything would change. Helper for lint.
+[private]
 fmt-check:
     @diff=$(gofmt -s -l .); \
     if [ -n "$diff" ]; then \
         echo "unformatted files:"; echo "$diff"; exit 1; \
     fi
 
-# Verify generated manpage markdown (docs/man/hex.{1,3}.md) matches the command tree.
+# Verify generated manpage markdown matches the command tree. Helper for lint.
+[private]
 man-check:
     #!/usr/bin/env bash
     set -euo pipefail
