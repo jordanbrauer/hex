@@ -109,7 +109,8 @@ brews:
       token: "{{ .Env.GITHUB_TOKEN }}"
       pull_request:
         enabled: false
-    directory: Formula
+    # No directory: formula lives at the repo root. Homebrew's tap
+    # loader accepts formulas at ./, Formula/, or HomebrewFormula/.
     install: |
       bin.install "hex"
     test: |

@@ -15,8 +15,10 @@ Publishing a GitHub Release with a semver tag triggers
    amd64 + arm64.
 2. Packages each build as a `.tar.gz` archive with `checksums.txt`.
 3. Uploads archives + checksums as release assets.
-4. Regenerates `Formula/hex.rb` pointing at the new archives and
-   commits it back to `main`.
+4. Regenerates `hex.rb` at the repo root pointing at the new
+   archives and commits it back to `main`. Homebrew's tap loader
+   accepts formulas at `./`, `Formula/`, or `HomebrewFormula/`;
+   hex uses the root path for a flatter layout.
 
 ## Cutting a release
 
@@ -49,7 +51,7 @@ ls ./dist
 
 Check the archive names match `hex_<version>_<os>_<arch>.tar.gz`, the
 per-platform binaries run (`./dist/hex_darwin_arm64_v0.0.0-…/hex --help`),
-and the generated `Formula/hex.rb` under `./dist` looks reasonable.
+and the generated formula under `./dist/homebrew/` looks reasonable.
 
 ## macOS Gatekeeper
 
