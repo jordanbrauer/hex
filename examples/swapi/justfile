@@ -1,0 +1,104 @@
+# swapi — task runner
+#
+# Run `just` with no arguments to list all recipes.
+
+set shell := ["bash", "-euo", "pipefail", "-c"]
+
+# List available recipes.
+default:
+    @just --list
+
+# Build the binary with ldflags-populated version info.
+build:
+    #!/usr/bin/env bash
+    VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo dev)
+    COMMIT=$(git rev-parse HEAD 2>/dev/null || echo unknown)
+    DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    go build -ldflags "-X github.com/jordanbrauer/hex/examples/swapi/app/build.version=$VERSION -X github.com/jordanbrauer/hex/examples/swapi/app/build.commit=$COMMIT -X github.com/jordanbrauer/hex/examples/swapi/app/build.date=$DATE" -o bin/swapi .
+
+# Build the frontend assets (CSS, TypeScript, vendored libs).
+build-fe:
+    pnpm exec vite build
+
+# Build everything (Go binary + frontend assets).
+build-all: build-fe build
+# Run tests.
+test:
+    go test ./...
+
+# Run tests with the race detector.
+race:
+    go test -race ./...
+
+# Run go vet.
+vet:
+    go vet ./...
+
+# Format all Go source in place.
+fmt:
+    gofmt -s -w .
+
+# Tidy the module graph.
+tidy:
+    go mod tidy
+
+# Full pre-commit gate: vet + race tests.
+check: vet race
+
+# Frontend recipes ---------------------------------------------------
+
+# Install pnpm dependencies + copy vendored libs into public/vendor.
+install-fe:
+    pnpm install
+
+# Watch + rebuild frontend assets on change (Ctrl+C to stop).
+dev-fe:
+    pnpm exec vite build --watch
+
+# Copy vendored htmx + alpine from node_modules into public/vendor/.
+# In TS mode vite bundles htmx + alpine into public/js/app.js, so
+# this recipe is only meaningful in JS mode.
+sync-fe:
+    @echo "sync-fe is a no-op in TS mode; htmx + alpine are bundled by vite into /js/app.js"
+
+# Lint JS/TS/CSS with biome.
+lint-fe:
+    pnpm exec biome check .
+
+# Auto-fix formatting.
+format-fe:
+    pnpm exec biome format --write .
+
+# Run frontend tests with vitest.
+test-fe:
+    pnpm exec vitest run
+
+# Watch frontend tests.
+test-fe-watch:
+    pnpm exec vitest
+# Run the app in dev mode. Rebuilds + restarts on Go / template /
+# config changes via air. Runs alongside the frontend watcher.
+#
+# Install air once: `go install github.com/air-verse/air@latest`
+# Frontend deps installed: `just install-fe`
+dev:
+    #!/usr/bin/env bash
+    set -uo pipefail
+    trap 'kill 0' EXIT
+    if [ -d node_modules ]; then
+        just dev-fe &
+    else
+        echo "note: node_modules missing; skipping frontend watcher. Run 'just install-fe' first." >&2
+    fi
+    air &
+    wait
+
+# Run the app once without any watcher.
+run:
+    go run .
+
+# Remove build artefacts.
+clean:
+    rm -rf bin/ tmp/
+    go clean -testcache
+    rm -rf public/css/app.css public/vendor/ public/js/app.js public/js/manifest.json

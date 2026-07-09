@@ -1,0 +1,33 @@
+// Package app wires this application's service providers into the hex
+// kernel. Providers themselves live in the app/provider subpackage;
+// this file lists them in Boot order.
+//
+// Order matters: hex/config's provider must run first so downstream
+// providers can read config values. Log follows so its level is set
+// before other providers emit anything.
+package app
+
+import (
+	"github.com/jordanbrauer/hex"
+
+	"github.com/jordanbrauer/hex/examples/swapi/app/provider"
+)
+
+// Boot registers every provider with kernel. Order matters — providers
+// are registered and booted in the order they appear here.
+//
+// hex make:provider inserts new provider registrations above the
+// `// hex:providers` marker below. Do not remove the marker.
+func Boot(kernel *hex.App) error {
+	return kernel.Register(
+		provider.Config(),
+		provider.Log(),
+		provider.Lua(),
+		provider.Database(),
+		provider.Web(),
+		provider.View(),
+		&provider.Routes{},
+		provider.ReplBindings(),
+		// hex:providers
+	)
+}

@@ -1,0 +1,25 @@
+{{ define "pages/films/show" }}
+{{ template "layouts/head" . }}
+<main>
+    <p><a href="/films">← All films</a></p>
+    <h2>Episode {{ .Film.EpisodeID }}: {{ .Film.Title }}</h2>
+    <dl>
+        <dt>Director</dt><dd>{{ .Film.Director }}</dd>
+        <dt>Producer</dt><dd>{{ .Film.Producer }}</dd>
+        <dt>Released</dt><dd>{{ .Film.ReleaseDate.Format "2006-01-02" }}</dd>
+    </dl>
+
+    <h3>Opening crawl</h3>
+    <div class="crawl">
+        {{ range .Crawl }}<p>{{ . }}</p>{{ end }}
+    </div>
+
+    <h3>Cast ({{ len .Cast }})</h3>
+    <ul class="cast">
+    {{ range .Cast }}
+        <li><a href="/people/{{ .ID }}">{{ .Name }}</a></li>
+    {{ end }}
+    </ul>
+</main>
+{{ template "layouts/foot" . }}
+{{ end }}

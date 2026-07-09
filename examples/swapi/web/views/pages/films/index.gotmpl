@@ -1,0 +1,22 @@
+{{ define "pages/films/index" }}
+{{ template "layouts/head" . }}
+<main>
+    <h2>Films</h2>
+    <table data-testid="films">
+        <thead>
+            <tr><th>Ep.</th><th>Title</th><th>Director</th><th>Released</th></tr>
+        </thead>
+        <tbody>
+        {{ range .Films }}
+            <tr class="film">
+                <td>{{ .EpisodeID }}</td>
+                <td><a href="/films/{{ .ID }}">{{ .Title }}</a></td>
+                <td>{{ .Director }}</td>
+                <td>{{ .ReleaseDate.Format "2006-01-02" }}</td>
+            </tr>
+        {{ end }}
+        </tbody>
+    </table>
+</main>
+{{ template "layouts/foot" . }}
+{{ end }}

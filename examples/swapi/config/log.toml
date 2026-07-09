@@ -1,0 +1,3 @@
+level = "info"
+caller = false
+timestamp = true

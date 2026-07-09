@@ -1,0 +1,25 @@
+{{ define "pages/people/show" }}
+{{ template "layouts/head" . }}
+<main>
+    <p><a href="/people">← All people</a></p>
+    <h2>{{ .Person.Name }}</h2>
+    <dl>
+        <dt>Homeworld</dt><dd>{{ .Person.Homeworld }}</dd>
+        <dt>Gender</dt><dd>{{ .Person.Gender }}</dd>
+        <dt>Born</dt><dd>{{ .Person.BirthYear }}</dd>
+        <dt>Height</dt><dd>{{ .Person.Height }} cm</dd>
+        <dt>Mass</dt><dd>{{ .Person.Mass }} kg</dd>
+        <dt>Hair</dt><dd>{{ .Person.HairColor }}</dd>
+        <dt>Skin</dt><dd>{{ .Person.SkinColor }}</dd>
+        <dt>Eyes</dt><dd>{{ .Person.EyeColor }}</dd>
+    </dl>
+
+    <h3>Appears in</h3>
+    <ul class="films">
+    {{ range .Films }}
+        <li><a href="/films/{{ .ID }}">Episode {{ .EpisodeID }} — {{ .Title }}</a></li>
+    {{ end }}
+    </ul>
+</main>
+{{ template "layouts/foot" . }}
+{{ end }}

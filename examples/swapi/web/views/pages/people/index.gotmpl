@@ -1,0 +1,22 @@
+{{ define "pages/people/index" }}
+{{ template "layouts/head" . }}
+<main>
+    <h2>People ({{ len .People }})</h2>
+    <table data-testid="people">
+        <thead>
+            <tr><th>Name</th><th>Homeworld</th><th>Gender</th><th>Born</th></tr>
+        </thead>
+        <tbody>
+        {{ range .People }}
+            <tr class="person">
+                <td><a href="/people/{{ .ID }}">{{ .Name }}</a></td>
+                <td>{{ .Homeworld }}</td>
+                <td>{{ .Gender }}</td>
+                <td>{{ .BirthYear }}</td>
+            </tr>
+        {{ end }}
+        </tbody>
+    </table>
+</main>
+{{ template "layouts/foot" . }}
+{{ end }}

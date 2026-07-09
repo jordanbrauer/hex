@@ -1,0 +1,20 @@
+{{ define "pages/planets/index" }}
+{{ template "layouts/head" . }}
+<main>
+    <h2>Planets ({{ len .Planets }})</h2>
+    <table data-testid="planets">
+        <thead><tr><th>Name</th><th>Climate</th><th>Terrain</th><th>Population</th></tr></thead>
+        <tbody>
+        {{ range .Planets }}
+            <tr class="planet">
+                <td>{{ .Name }}</td>
+                <td>{{ .Climate }}</td>
+                <td>{{ .Terrain }}</td>
+                <td>{{ .Population }}</td>
+            </tr>
+        {{ end }}
+        </tbody>
+    </table>
+</main>
+{{ template "layouts/foot" . }}
+{{ end }}
