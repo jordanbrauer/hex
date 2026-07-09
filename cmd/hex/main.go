@@ -45,6 +45,7 @@ func newRoot() *cobra.Command {
 		newInitCommand(),
 		newPublishCommand(),
 		newRunCommand(),
+		newReplCommand(),
 		newMakeProviderCommand(),
 		newMakeDomainCommand(),
 		newMakeMigrationCommand(),
