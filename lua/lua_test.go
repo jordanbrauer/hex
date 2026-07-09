@@ -209,6 +209,49 @@ func TestSetGlobal_luaValuePassesThrough(t *testing.T) {
 	}
 }
 
+func TestSetStdout_redirectsPrint(t *testing.T) {
+	env := lua.New()
+	t.Cleanup(func() { _ = env.Close() })
+
+	var buf strings.Builder
+	env.SetStdout(&buf)
+
+	if err := env.ExecString(`print("hello", 42, true)`, "print.lua"); err != nil {
+		t.Fatalf("Exec: %v", err)
+	}
+
+	got := buf.String()
+	if !strings.Contains(got, "hello") {
+		t.Errorf("missing 'hello': %q", got)
+	}
+
+	if !strings.Contains(got, "42") {
+		t.Errorf("missing '42': %q", got)
+	}
+
+	if !strings.Contains(got, "true") {
+		t.Errorf("missing 'true': %q", got)
+	}
+
+	if !strings.HasSuffix(got, "\n") {
+		t.Errorf("missing trailing newline: %q", got)
+	}
+}
+
+func TestSetStdout_nilRestoresDefault(t *testing.T) {
+	env := lua.New()
+	t.Cleanup(func() { _ = env.Close() })
+
+	var buf strings.Builder
+	env.SetStdout(&buf)
+	env.SetStdout(nil)
+
+	// Just verify it didn't panic and the writer is non-nil.
+	if env.Stdout() == nil {
+		t.Errorf("nil SetStdout should restore os.Stdout, got nil")
+	}
+}
+
 func TestPreloadModule_isRequirable(t *testing.T) {
 	env := lua.New()
 	defer env.Close()

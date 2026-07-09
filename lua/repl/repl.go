@@ -245,14 +245,21 @@ func runScripted(env *hexlua.Environment, session *teal.Session, isTeal bool, op
 // styled output. Requires a TTY on stdin.
 func runInteractive(env *hexlua.Environment, session *teal.Session, isTeal bool, prompt, banner string) error {
 	// evaluator is a synchronous closure the TUI calls for each
-	// submitted line. It captures env + session; return values
-	// feed the viewport.
+	// submitted line. Print output from Lua is redirected into the
+	// same buffer as expression-return values so Result.Output
+	// contains everything the user typed produced — no output goes
+	// to os.Stdout during a REPL evaluation, which would otherwise
+	// clobber Bubble Tea's render.
 	evaluator := func(line string) tuirepl.Result {
 		if isExitDirective(line) {
 			return tuirepl.Result{Exit: true}
 		}
 
 		var outBuf strings.Builder
+
+		origStdout := env.Stdout()
+		env.SetStdout(&outBuf)
+		defer env.SetStdout(origStdout)
 
 		if err := evalLine(env, &outBuf, line, isTeal, session); err != nil {
 			msg := trimTraceback(err.Error())
