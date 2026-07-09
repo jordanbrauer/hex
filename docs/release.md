@@ -1,7 +1,14 @@
 # Releasing hex
 
-Releases are automated. Publishing a GitHub Release with a semver tag
-triggers `.github/workflows/release.yml`, which runs
+The release pipeline ships **the `hex` CLI scaffolder only**. The rest
+of the repo is a Go module — consumers import it via `go get` and
+resolve versions from git tags directly, no build artefacts required.
+Every tag serves both purposes: it's what `go get github.com/
+jordanbrauer/hex@vX.Y.Z` resolves against, *and* it's what fires the
+GoReleaser workflow that publishes the CLI binaries.
+
+Publishing a GitHub Release with a semver tag triggers
+`.github/workflows/release.yml`, which runs
 [GoReleaser](https://goreleaser.com) against `.goreleaser.yaml`:
 
 1. Cross-compiles the `hex` CLI (`./cmd/hex`) for darwin + linux,

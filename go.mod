@@ -5,7 +5,10 @@ go 1.26.5
 require (
 	charm.land/fantasy v0.35.2
 	cuelang.org/go v0.17.0
+	github.com/Joker/jade v1.1.3
 	github.com/Oudwins/zog v0.22.2
+	github.com/PuerkitoBio/goquery v1.12.0
+	github.com/alecthomas/chroma/v2 v2.27.0
 	github.com/alitto/pond/v2 v2.7.1
 	github.com/casbin/casbin/v2 v2.135.0
 	github.com/charmbracelet/bubbles v1.0.0
@@ -33,6 +36,9 @@ require (
 	github.com/spf13/viper v1.21.0
 	github.com/thomaspoignant/go-feature-flag v1.55.0
 	github.com/thomaspoignant/go-feature-flag/modules/core v0.7.2
+	github.com/yuin/goldmark v1.8.2
+	github.com/yuin/goldmark-highlighting/v2 v2.0.0-20230729083705-37449abec8cc
+	github.com/yuin/goldmark-meta v1.1.0
 	github.com/yuin/gopher-lua v1.1.2
 	go.opentelemetry.io/otel v1.44.0
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.44.0
@@ -44,6 +50,7 @@ require (
 	go.opentelemetry.io/otel/sdk/metric v1.44.0
 	go.opentelemetry.io/otel/trace v1.44.0
 	golang.org/x/crypto v0.54.0
+	golang.org/x/net v0.57.0
 	golang.org/x/text v0.40.0
 	golang.org/x/time v0.15.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -55,9 +62,6 @@ require (
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
 	github.com/BurntSushi/toml v1.6.0 // indirect
-	github.com/Joker/jade v1.1.3 // indirect
-	github.com/PuerkitoBio/goquery v1.12.0 // indirect
-	github.com/alecthomas/chroma/v2 v2.27.0 // indirect
 	github.com/andybalholm/cascadia v1.3.3 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.0 // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
@@ -145,9 +149,6 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
-	github.com/yuin/goldmark v1.8.2 // indirect
-	github.com/yuin/goldmark-highlighting/v2 v2.0.0-20230729083705-37449abec8cc // indirect
-	github.com/yuin/goldmark-meta v1.1.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.69.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.69.0 // indirect
@@ -155,7 +156,6 @@ require (
 	go.opentelemetry.io/proto/otlp v1.10.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56 // indirect
-	golang.org/x/net v0.57.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
