@@ -108,7 +108,7 @@ type Styles struct {
 func DefaultStyles() Styles {
 	return Styles{
 		Prompt: lipgloss.NewStyle().
-			Foreground(lipgloss.AdaptiveColor{Light: "#0068AA", Dark: "#5AB0FF"}).
+			Foreground(lipgloss.Color("#3e8b9b")).
 			Bold(true),
 		Input: lipgloss.NewStyle(),
 		Output: lipgloss.NewStyle().
