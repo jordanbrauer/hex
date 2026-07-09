@@ -55,8 +55,9 @@ const (
 	ModeFennel
 )
 
-// String returns the human-readable mode name used in the banner and
-// prompt.
+// String returns the full mode name used in the banner
+// ("teal", "lua", "fennel"). For the short prompt tag, see
+// Short().
 func (m Mode) String() string {
 	switch m {
 	case ModeLua:
@@ -65,6 +66,20 @@ func (m Mode) String() string {
 		return "fennel"
 	default:
 		return "teal"
+	}
+}
+
+// Short returns the abbreviated mode tag used in the prompt:
+// "tl" / "lua" / "fnl". Lua stays spelled out since it's already
+// three letters and the standard file extension.
+func (m Mode) Short() string {
+	switch m {
+	case ModeLua:
+		return "lua"
+	case ModeFennel:
+		return "fnl"
+	default:
+		return "tl"
 	}
 }
 
@@ -212,7 +227,7 @@ func Run(opts Options) error {
 		)
 	}
 
-	prompt := opts.AppName + "(" + opts.Mode.String() + ")> "
+	prompt := opts.AppName + "(" + opts.Mode.Short() + ")> "
 
 	if opts.Interactive {
 		return runInteractive(env, tealSession, opts.Mode, opts.AppName, strings.Join(bannerLines, "\n"))
@@ -376,8 +391,8 @@ func runInteractive(env *hexlua.Environment, session *teal.Session, defaultMode 
 	tealMode := tuirepl.Mode{
 		Name:               "teal",
 		Activator:          't',
-		Prompt:             appName + "(teal)> ",
-		ContinuationPrompt: appName + "(teal). ",
+		Prompt:             appName + "(tl)> ",
+		ContinuationPrompt: appName + "(tl). ",
 		PromptColor:        lipgloss.Color("#3e8b9b"),
 	}
 
