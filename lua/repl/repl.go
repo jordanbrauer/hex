@@ -370,6 +370,7 @@ func runInteractive(env *hexlua.Environment, session *teal.Session, isTeal bool,
 	model := tuirepl.New(tuirepl.Options{
 		Banner:       banner,
 		Evaluator:    evaluator,
+		Completer:    completer(env),
 		Modes:        modes,
 		HistoryLimit: 1000,
 	})

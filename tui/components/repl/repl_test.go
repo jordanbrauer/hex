@@ -451,6 +451,157 @@ func TestContinuation_modePromptUsedInMultiModeSetup(t *testing.T) {
 	}
 }
 
+func TestCompletion_singleMatchInserts(t *testing.T) {
+	m := New(Options{
+		Prompt:    "> ",
+		Evaluator: func(_, _ string) Result { return Result{} },
+		Completer: func(_, input string, cursor int) ([]Candidate, int) {
+			return []Candidate{{Text: "query"}}, 0
+		},
+	})
+
+	m = typeString(t, m, "q")
+	m = press(t, m, tea.KeyTab)
+
+	if got := m.input.Value(); got != "query" {
+		t.Errorf("input = %q, want query", got)
+	}
+}
+
+func TestCompletion_cyclesOnRepeatedTab(t *testing.T) {
+	cands := []Candidate{{Text: "query"}, {Text: "queryOne"}, {Text: "quit"}}
+
+	m := New(Options{
+		Prompt:    "> ",
+		Evaluator: func(_, _ string) Result { return Result{} },
+		Completer: func(_, input string, cursor int) ([]Candidate, int) {
+			return cands, 0
+		},
+	})
+
+	m = typeString(t, m, "q")
+
+	m = press(t, m, tea.KeyTab)
+	if got := m.input.Value(); got != "query" {
+		t.Errorf("first tab: %q, want query", got)
+	}
+
+	m = press(t, m, tea.KeyTab)
+	if got := m.input.Value(); got != "queryOne" {
+		t.Errorf("second tab: %q, want queryOne", got)
+	}
+
+	m = press(t, m, tea.KeyTab)
+	if got := m.input.Value(); got != "quit" {
+		t.Errorf("third tab: %q, want quit", got)
+	}
+
+	// Wraps around.
+	m = press(t, m, tea.KeyTab)
+	if got := m.input.Value(); got != "query" {
+		t.Errorf("fourth tab (wrap): %q, want query", got)
+	}
+}
+
+func TestCompletion_shiftTabCyclesBackward(t *testing.T) {
+	cands := []Candidate{{Text: "one"}, {Text: "two"}, {Text: "three"}}
+
+	m := New(Options{
+		Prompt:    "> ",
+		Evaluator: func(_, _ string) Result { return Result{} },
+		Completer: func(_, _ string, _ int) ([]Candidate, int) {
+			return cands, 0
+		},
+	})
+
+	m = typeString(t, m, "o")
+
+	m = press(t, m, tea.KeyTab)
+	if got := m.input.Value(); got != "one" {
+		t.Errorf("first tab: %q", got)
+	}
+
+	m = press(t, m, tea.KeyShiftTab)
+	if got := m.input.Value(); got != "three" {
+		t.Errorf("shift-tab (wrap backward): %q, want three", got)
+	}
+}
+
+func TestCompletion_prefixReplacement(t *testing.T) {
+	// Completer returns a prefixStart into an existing input string:
+	// input="db.q" cursor=4 → prefixStart=3 (after the '.') means
+	// candidates replace "q" only, not the whole thing.
+	m := New(Options{
+		Prompt:    "> ",
+		Evaluator: func(_, _ string) Result { return Result{} },
+		Completer: func(_, input string, cursor int) ([]Candidate, int) {
+			return []Candidate{{Text: "query"}, {Text: "queryOne"}}, 3
+		},
+	})
+
+	m = typeString(t, m, "db.q")
+	m = press(t, m, tea.KeyTab)
+
+	if got := m.input.Value(); got != "db.query" {
+		t.Errorf("first tab: %q, want db.query", got)
+	}
+
+	m = press(t, m, tea.KeyTab)
+	if got := m.input.Value(); got != "db.queryOne" {
+		t.Errorf("second tab: %q, want db.queryOne", got)
+	}
+}
+
+func TestCompletion_typingAfterTabCommitsAndResets(t *testing.T) {
+	m := New(Options{
+		Prompt:    "> ",
+		Evaluator: func(_, _ string) Result { return Result{} },
+		Completer: func(_, _ string, _ int) ([]Candidate, int) {
+			return []Candidate{{Text: "query"}, {Text: "queryOne"}}, 0
+		},
+	})
+
+	m = typeString(t, m, "q")
+	m = press(t, m, tea.KeyTab)
+
+	if got := m.input.Value(); got != "query" {
+		t.Fatalf("first tab: %q", got)
+	}
+
+	// Typing a character breaks the cycle: subsequent Tab starts
+	// a fresh completion on the new prefix.
+	m = typeString(t, m, "z")
+
+	if m.completionActive {
+		t.Errorf("cycle should reset after typing")
+	}
+
+	if got := m.input.Value(); got != "queryz" {
+		t.Errorf("input after typing: %q", got)
+	}
+}
+
+func TestCompletion_emptyCandidatesIsNoOp(t *testing.T) {
+	m := New(Options{
+		Prompt:    "> ",
+		Evaluator: func(_, _ string) Result { return Result{} },
+		Completer: func(_, _ string, _ int) ([]Candidate, int) {
+			return nil, 0
+		},
+	})
+
+	m = typeString(t, m, "xyz")
+	m = press(t, m, tea.KeyTab)
+
+	if got := m.input.Value(); got != "xyz" {
+		t.Errorf("input should be unchanged with no candidates: %q", got)
+	}
+
+	if m.completionActive {
+		t.Errorf("no cycle should start when candidates are empty")
+	}
+}
+
 func TestViewIsOnlyPromptLine(t *testing.T) {
 	m := New(Options{
 		Prompt:    "> ",

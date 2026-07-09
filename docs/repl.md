@@ -204,6 +204,36 @@ has no file, and history isn't important enough to block the REPL.
 
 Up/Down at the prompt cycles through it just like any REPL.
 
+## Tab completion
+
+Tab completes the identifier at the cursor by inspecting the Lua
+state's globals table.
+
+```
+myapp(teal)> pri<TAB>          → print
+myapp(teal)> db.q<TAB>          → db.query
+myapp(teal)> db.q<TAB><TAB>     → db.queryOne  (cycles)
+myapp(teal)> db.q<TAB><TAB><TAB> → db.query      (wraps)
+```
+
+- **Bare identifier prefix** — walks `_G`, offers all globals
+  starting with the prefix. Framework modules (`db`, `cache`,
+  `config`, `log`, `env`, `events`, `queue`) and user globals show up.
+- **Member access** (`receiver.prefix`) — walks into the receiver's
+  table, offers its keys that match the prefix. Chained access
+  (`obj.a.b.<TAB>`) is supported.
+- **Names starting with `_`** are hidden (Lua convention for
+  internals: `_G`, `_ENV`, framework `_hex_*` bookkeeping).
+- **Cycle** with repeated Tab; **Shift-Tab** cycles backward.
+- Any keystroke that isn't Tab breaks the cycle so the next Tab
+  starts a fresh completion on the new prefix.
+
+Source: runtime introspection of the live Lua state. No
+tree-sitter dependency; the tradeoff is that only globals + their
+table members are visible — chunk-local `local x = ...`
+declarations aren't in scope for completion (they don't survive
+chunk boundaries anyway).
+
 ## Multi-line input
 
 When you hit Enter on syntactically incomplete input, the REPL
@@ -233,12 +263,12 @@ so you can recall a function definition and edit it as a unit.
 
 ## Limitations & follow-ups
 
-- **No tab completion** — the biggest remaining UX gap. Would
-  introspect registered modules (`db.<TAB>` → `query queryOne
-  exec transaction`) plus Teal-scope locals. Substantial work;
-  on the pile as pi-fox.6.
 - **No Ctrl+R reverse history search** — medium effort; a
   dedicated "search mode" over the persisted history.
+- **No syntax highlighting** — design doc at
+  [docs/designs/tree-sitter.md](designs/tree-sitter.md).
+- **No fuzzy completion** — Tab currently matches by prefix only.
+  Fzf-style middle-of-word matching is a future enhancement.
 - **No multi-line continuation** — function definitions must be
   one-liners or come from a script file. Follow-up: pi-fox.6.
 - **No dot-commands** — `.help`, `.mode`, `.env`, `.reset` are on
