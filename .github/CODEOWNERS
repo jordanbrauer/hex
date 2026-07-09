@@ -1,0 +1,8 @@
+# Every file in the repo is owned by @jordanbrauer. Pull requests are
+# auto-assigned to him for review.
+#
+# Ordering: later matches take priority. As the repo grows, add more
+# specific patterns above rules that shouldn't be overridden, and more
+# specific team ownership below the catch-all.
+
+*    @jordanbrauer
