@@ -104,6 +104,101 @@ func Compile(L *lua.LState, source, filename string) (string, error) {
 	return out.String(), nil
 }
 
+// Session wraps an LState with a persistent Teal env, so subsequent
+// compiles see prior declarations. Use this for REPLs and any other
+// interactive loop where each snippet is its own "chunk" but must
+// share a symbol table with previous chunks.
+//
+// Non-Session Compile/Check calls typecheck each snippet in isolation
+// (correct for scripts, wrong for REPLs).
+type Session struct {
+	L *lua.LState
+}
+
+// NewSession initialises a Teal env stashed on L under a private
+// global (_hex_teal_env) with strict typechecking. L must have had
+// Load called on it.
+//
+// Use NewLaxSession for REPL-friendly loose typechecking that
+// permits implicit globals and Lua-esque patterns.
+func NewSession(L *lua.LState) (*Session, error) {
+	return newSession(L, false)
+}
+
+// NewLaxSession is like NewSession but flips Teal's lax typecheck
+// mode on. In lax mode Teal permits implicit globals (foo = 12
+// without an explicit declaration) and generally relaxes strictness
+// — well-suited to REPL interaction where every line is its own
+// chunk and users don't want to sprinkle 'global' declarations.
+func NewLaxSession(L *lua.LState) (*Session, error) {
+	return newSession(L, true)
+}
+
+func newSession(L *lua.LState, lax bool) (*Session, error) {
+	L.SetGlobal("_hex_teal_lax", lua.LBool(lax))
+
+	err := L.DoString(`
+		_hex_teal_env = tl.init_env(_hex_teal_lax, 'optional', '5.1')
+		_hex_teal_lax = nil
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("teal: init session env: %w", err)
+	}
+
+	return &Session{L: L}, nil
+}
+
+// Compile transpiles Teal source using the session's persistent env,
+// so declarations from prior Compile calls remain visible.
+func (s *Session) Compile(source, filename string) (string, error) {
+	s.L.SetGlobal("_hex_teal_src", lua.LString(source))
+	s.L.SetGlobal("_hex_teal_name", lua.LString(filename))
+
+	defer func() {
+		s.L.SetGlobal("_hex_teal_src", lua.LNil)
+		s.L.SetGlobal("_hex_teal_name", lua.LNil)
+	}()
+
+	err := s.L.DoString(`
+		local src = _hex_teal_src
+		local name = _hex_teal_name
+		local env = _hex_teal_env
+		if env == nil then
+			error('teal session env not initialised', 0)
+		end
+		if env.loaded then env.loaded[name] = nil end
+		local result, perr = tl.process_string(src, false, env, name)
+		if perr ~= nil then
+			error(name .. ': teal process: ' .. tostring(perr), 0)
+		end
+		if result.syntax_errors and #result.syntax_errors > 0 then
+			local e = result.syntax_errors[1]
+			error((e.filename or name) .. ':' .. tostring(e.y) .. ': ' .. tostring(e.msg), 0)
+		end
+		if result.type_errors and #result.type_errors > 0 then
+			local e = result.type_errors[1]
+			error((e.filename or name) .. ':' .. tostring(e.y) .. ': type error: ' .. tostring(e.msg), 0)
+		end
+		local code, gerr = tl.pretty_print_ast(result.ast, "5.1")
+		if gerr ~= nil then
+			error(name .. ': teal codegen: ' .. tostring(gerr), 0)
+		end
+		_hex_teal_out = code
+	`)
+	if err != nil {
+		return "", err
+	}
+
+	out := s.L.GetGlobal("_hex_teal_out")
+	s.L.SetGlobal("_hex_teal_out", lua.LNil)
+
+	if out.Type() != lua.LTString {
+		return "", errors.New("teal: no output produced")
+	}
+
+	return out.String(), nil
+}
+
 // Check runs tl.process on the source but stops before code
 // generation, returning any syntax + type errors found. Useful for
 // CI: fail the build on Teal type errors without executing anything.
