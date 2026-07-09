@@ -1,0 +1,27 @@
+# https://editorconfig.org
+
+root = true
+
+[*]
+end_of_line = lf
+insert_final_newline = true
+charset = utf-8
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+# Go source and templates use tabs.
+[*.{go,gotmpl}]
+indent_style = tab
+
+# YAML / Markdown are 2-space by convention.
+[*.{yml,yaml,md}]
+indent_size = 2
+
+# Makefile-style files require tabs.
+[Makefile]
+indent_style = tab
+
+# Go module files
+[{go.mod,go.sum}]
+indent_style = tab

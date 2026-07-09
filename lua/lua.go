@@ -568,8 +568,7 @@ func toLuaValue(L *lua.LState, v any) (lua.LValue, error) {
 	case float64:
 		return lua.LNumber(x), nil
 	case lua.LValue:
-		return x, nil
-	case *lua.LTable:
+		// Matches every gopher-lua value type, including *lua.LTable.
 		return x, nil
 	default:
 		return nil, fmt.Errorf("unsupported Go type %T (pass lua.LValue for complex types)", v)

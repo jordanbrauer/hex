@@ -83,7 +83,10 @@ func TestRoot_stashesAppInContext(t *testing.T) {
 }
 
 func TestFromContext_nilCtxAndNoAppReturnsNil(t *testing.T) {
-	if got := hexcli.FromContext(nil); got != nil {
+	// Explicitly assert FromContext survives a nil ctx. Callers in
+	// tests and CLI-shutdown paths pass whatever is at hand; this
+	// guarantees no panic and a nil return.
+	if got := hexcli.FromContext(nil); got != nil { //nolint:staticcheck // SA1012: nil ctx is the case under test
 		t.Errorf("FromContext(nil) = %v, want nil", got)
 	}
 

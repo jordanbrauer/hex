@@ -1,0 +1,53 @@
+# hex uses a deliberately loose linter set for now — enough to catch
+# real bugs without blocking existing code on style. Strictness gets
+# ratcheted up in follow-up passes; open a PR before adding a linter
+# that flags a large chunk of the tree.
+#
+# golangci-lint v2 config format.
+
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  default: none
+  enable:
+    - govet          # official — suspicious constructs
+    - staticcheck    # SA rules — real bugs + performance
+    - ineffassign    # unused assignments
+
+  exclusions:
+    rules:
+      # Tests routinely declare `var _ SomeInterface = concreteExpr`
+      # to prove type-alias / interface-satisfaction. The explicit
+      # type is the assertion; QF1011 misfires here.
+      - path: _test\.go
+        text: "QF1011"
+
+  settings:
+    govet:
+      enable-all: true
+      disable:
+        # fieldalignment is noisy and rarely worth its churn.
+        - fieldalignment
+        # shadow is opinionated about a legitimate Go pattern.
+        - shadow
+
+    staticcheck:
+      # Excluded checks trade off catching bugs against churning
+      # wrappers that pin a specific upstream API version. Revisit
+      # after the corresponding upstream migrations land.
+      checks:
+        - all
+        # SA1019: don't warn on deprecated APIs from wrapped libraries.
+        # We intentionally track the same version those consumers use
+        # and migrate deliberately, not on every deprecation notice.
+        - "-SA1019"
+        # QF1001 (De Morgan's law) is a style suggestion, not a bug.
+        - "-QF1001"
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

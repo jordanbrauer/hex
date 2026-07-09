@@ -96,11 +96,12 @@ func TestStream_returnsErrWhenNoDefault(t *testing.T) {
 // Compile-time assertions: type aliases remain aliases so hex/ai and
 // fantasy values interchange without conversions.
 func TestTypeAliasesAreAliases(t *testing.T) {
-	var (
-		_ ai.Agent    = (fantasy.Agent)(nil)
-		_ ai.Provider = (fantasy.Provider)(nil)
-		_ ai.Tool     = (fantasy.AgentTool)(nil)
-		_             = ai.Call(fantasy.AgentCall{})
-		_             = ai.Result(fantasy.AgentResult{})
-	)
+	// Assigning to interface variables of type ai.T from concrete
+	// fantasy.T only compiles when ai.T is an alias (not a distinct
+	// named type). Casts must succeed identically.
+	var _ ai.Agent = fantasy.Agent(nil)
+	var _ ai.Provider = fantasy.Provider(nil)
+	var _ ai.Tool = fantasy.AgentTool(nil)
+	var _ = ai.Call(fantasy.AgentCall{})
+	var _ = ai.Result(fantasy.AgentResult{})
 }

@@ -234,10 +234,11 @@ func TestHandlerError_dropsAfterMaxRetries(t *testing.T) {
 	// Wait long enough that a fourth attempt would have happened.
 	deadline := time.After(500 * time.Millisecond)
 
+waitLoop:
 	for atomic.LoadInt64(&attempts) < 3 {
 		select {
 		case <-deadline:
-			break
+			break waitLoop
 		default:
 			time.Sleep(10 * time.Millisecond)
 		}
