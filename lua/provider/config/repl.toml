@@ -4,4 +4,4 @@
 #   Interactive language for `<app> repl`. Teal by default; strict
 #   typechecking with a persistent session env. Set to "lua" for a
 #   looser Lua REPL — implicit globals allowed, no typechecker.
-mode = "teal"
+mode = "fennel"
