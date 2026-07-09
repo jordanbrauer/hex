@@ -1,6 +1,9 @@
 package main
 
 import (
+	"os"
+
+	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 
 	"github.com/jordanbrauer/hex/lua/repl"
@@ -33,11 +36,12 @@ Exit with Ctrl+D, "exit", or "quit".`,
 			}
 
 			return repl.Run(repl.Options{
-				Mode:    mode,
-				In:      cmd.InOrStdin(),
-				Out:     cmd.OutOrStdout(),
-				ErrOut:  cmd.ErrOrStderr(),
-				AppName: "hex",
+				Mode:        mode,
+				In:          cmd.InOrStdin(),
+				Out:         cmd.OutOrStdout(),
+				ErrOut:      cmd.ErrOrStderr(),
+				AppName:     "hex",
+				Interactive: isatty.IsTerminal(os.Stdin.Fd()),
 			})
 		},
 	}

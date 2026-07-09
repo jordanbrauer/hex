@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 
 	"github.com/jordanbrauer/hex"
@@ -59,13 +60,14 @@ func ReplCommand(app *hex.App) *cobra.Command {
 			appName := binaryName()
 
 			return repl.Run(repl.Options{
-				Mode:    mode,
-				In:      cmd.InOrStdin(),
-				Out:     cmd.OutOrStdout(),
-				ErrOut:  cmd.ErrOrStderr(),
-				AppName: appName,
-				Banner:  banner,
-				Env:     luaEnv,
+				Mode:        mode,
+				In:          cmd.InOrStdin(),
+				Out:         cmd.OutOrStdout(),
+				ErrOut:      cmd.ErrOrStderr(),
+				AppName:     appName,
+				Banner:      banner,
+				Env:         luaEnv,
+				Interactive: isatty.IsTerminal(os.Stdin.Fd()),
 			})
 		},
 	}
