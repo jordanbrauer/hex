@@ -1,0 +1,108 @@
+package provider
+
+import (
+	"fmt"
+
+	glua "github.com/yuin/gopher-lua"
+
+	"github.com/jordanbrauer/hex/container"
+	hexlua "github.com/jordanbrauer/hex/lua"
+	"github.com/jordanbrauer/hex/provider"
+)
+
+// ReplBindings installs application-specific Lua modules on the
+// shared hex/lua environment. Every module registered here shows
+// up in the REPL (`{{.BinaryName}} repl`) and in any .tl / .lua
+// scripts the app runs.
+//
+// Framework modules (db, cache, config, log, env, events, queue)
+// are already registered by their own providers — you don't need
+// to add them here. This file is for YOUR domain services.
+//
+// Pattern per module:
+//
+//  1. env.SetType("name", `... Teal .d.tl source ...`)
+//        Compile-time metadata. Enables Teal REPL to type-check
+//        `name.foo(...)`. Optional but strongly recommended —
+//        without a stub Teal errors on require("name") and you'll
+//        have to drop to `--mode lua` in the REPL.
+//
+//  2. env.PreloadModule("name", loader)
+//        Runtime installer. The loader function receives *lua.LState
+//        and pushes a table (the module) onto the stack.
+//
+// The commented example below exposes a `users` module backed by a
+// hypothetical UserService. Uncomment + adapt as your codebase grows.
+// hex make:domain will insert new bindings above the `// hex:repl`
+// marker; do not remove the marker.
+func ReplBindings() provider.Service {
+	return &replBindings{}
+}
+
+type replBindings struct {
+	provider.Base
+}
+
+func (p *replBindings) Register(app provider.Application) error {
+	env, err := container.Make[*hexlua.Environment](app, "lua")
+	if err != nil {
+		return fmt.Errorf("app/provider: resolve lua: %w", err)
+	}
+
+	// Example — exposing a domain service to the REPL.
+	// -------------------------------------------------
+	// Assume your app has domain/users with a UserService that has:
+	//   func (s *UserService) Count(ctx) (int, error)
+	//   func (s *UserService) FindByEmail(ctx, string) (*User, error)
+	//
+	// You can expose it to Lua like this:
+	//
+	// users, err := container.Make[*users.Service](app, "users")
+	// if err != nil {
+	//     return fmt.Errorf("app/provider: resolve users: %w", err)
+	// }
+	//
+	// env.SetType("users", `
+	// 	local record User
+	// 	    id: integer
+	// 	    email: string
+	// 	    name: string
+	// 	end
+	// 	local record users
+	// 	    count: function(): (integer, string)
+	// 	    find_by_email: function(email: string): (User, string)
+	// 	end
+	// 	return users
+	// `)
+	//
+	// env.PreloadModule("users", func(L *glua.LState) int {
+	// 	mod := L.SetFuncs(L.NewTable(), map[string]glua.LGFunction{
+	// 		"count": func(L *glua.LState) int {
+	// 			n, err := users.Count(context.Background())
+	// 			if err != nil {
+	// 				L.Push(glua.LNil)
+	// 				L.Push(glua.LString(err.Error()))
+	// 				return 2
+	// 			}
+	// 			L.Push(glua.LNumber(n))
+	// 			L.Push(glua.LNil)
+	// 			return 2
+	// 		},
+	// 		// ... find_by_email similarly ...
+	// 	})
+	// 	L.Push(mod)
+	// 	return 1
+	// })
+	//
+	// Then in the REPL:
+	//   myapp(teal)> local n, err = users.count()
+	//   myapp(teal)> print("users:", n)
+
+	// hex:repl
+
+	// Silence unused imports until at least one binding is added.
+	_ = env
+	_ = glua.LNil
+
+	return nil
+}
