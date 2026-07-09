@@ -102,6 +102,40 @@ func TestTabulate_map_twoColumnKeyValue(t *testing.T) {
 	}
 }
 
+func TestTabulate_indexColumn(t *testing.T) {
+	// Every non-empty table gets a leading `#` column with 0-indexed
+	// row numbers, matching nushell-style listings.
+	got := tabulate(newTable(t, `{ "widgets", "gadgets", "gizmos" }`))
+
+	if !strings.Contains(got, "# ") && !strings.Contains(got, " # ") {
+		t.Errorf("missing # header\n%s", got)
+	}
+
+	for _, want := range []string{"0", "1", "2"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing index %q\n%s", want, got)
+		}
+	}
+}
+
+func TestTabulate_openSides(t *testing.T) {
+	// Nushell-style: no left/right vertical borders. Horizontal
+	// rules extend past the outermost column separators; every non-
+	// header line must start with a space (padding cell) or a rule
+	// character (─), never a vertical border character (│).
+	got := tabulate(newTable(t, `{ { a = 1, b = 2 } }`))
+
+	for i, line := range strings.Split(got, "\n") {
+		if line == "" {
+			continue
+		}
+
+		if strings.HasPrefix(line, "│") || strings.HasSuffix(strings.TrimRight(line, " "), "│") {
+			t.Errorf("line %d has left/right border: %q", i, line)
+		}
+	}
+}
+
 func TestTabulate_nestedTablesCollapse(t *testing.T) {
 	// The inner table in the `films` column shouldn't be printed as
 	// a giant sub-grid — it collapses to {…} so the outer grid
