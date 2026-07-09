@@ -186,11 +186,35 @@ the REPL is a real write on the live app's DB/cache/queue. Use
 sparingly, and consider running against a read replica when the
 option exists.
 
+## History persistence
+
+Interactive sessions persist their command history to disk between
+runs. Location follows the platform convention (via
+`os.UserConfigDir`):
+
+| OS      | Path                                                    |
+|---------|---------------------------------------------------------|
+| Linux   | `$XDG_CONFIG_HOME/<app>/repl-history` or `~/.config/...`|
+| macOS   | `~/Library/Application Support/<app>/repl-history`      |
+| Windows | `%AppData%\<app>\repl-history`                          |
+
+Writes are atomic (temp file + rename) so a crash mid-write won't
+corrupt the history. Load / save failures are silent — first run
+has no file, and history isn't important enough to block the REPL.
+
+Up/Down at the prompt cycles through it just like any REPL.
+
 ## Limitations & follow-ups
 
-- **No readline** — `bufio.Scanner` reads plain lines. Arrow-key
-  history, line editing, and tab completion require a readline
-  library (chzyer/readline). Follow-up: pi-fox.6.
+- **No tab completion** — the biggest UX gap. Would introspect
+  registered modules (`db.<TAB>` → `query queryOne exec
+  transaction`) plus Teal-scope locals. Substantial work; on the
+  pile as pi-fox.6.
+- **No Ctrl+R reverse history search** — medium effort; a
+  dedicated "search mode" over the persisted history.
+- **No multi-line continuation** — function definitions must be
+  one-liners or come from a script file. Needs incomplete-parse
+  detection.
 - **No multi-line continuation** — function definitions must be
   one-liners or come from a script file. Follow-up: pi-fox.6.
 - **No dot-commands** — `.help`, `.mode`, `.env`, `.reset` are on

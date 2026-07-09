@@ -19,6 +19,8 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -334,15 +336,91 @@ func runInteractive(env *hexlua.Environment, session *teal.Session, isTeal bool,
 		HistoryLimit: 1000,
 	})
 
+	// Load persisted history from disk. Failure is silent — first
+	// run has no file, and a corrupt file isn't worth crashing the
+	// REPL over.
+	if hist := loadHistory(appName); len(hist) > 0 {
+		model = model.SetHistory(hist)
+	}
+
 	// Inline mode (no alt-screen): the model only renders the input
 	// line via View, and pushes everything else into the terminal's
 	// scrollback via tea.Println. This keeps native scroll, mouse
 	// selection, and shell history working without hijacking them.
 	prog := tea.NewProgram(model)
 
-	_, err := prog.Run()
+	finalModel, err := prog.Run()
+
+	// Persist whatever history the final model accumulated. Save on
+	// error too — the user's typing shouldn't vanish because their
+	// script threw. Failure to save is again silent (best-effort).
+	if fm, ok := finalModel.(tuirepl.Model); ok {
+		_ = saveHistory(appName, fm.History())
+	}
 
 	return err
+}
+
+// historyPath returns the on-disk location of the REPL history file
+// for appName. Uses os.UserConfigDir so it respects XDG on Linux
+// (~/.config/<appName>/repl-history), Library/Application Support
+// on macOS, and %AppData% on Windows.
+func historyPath(appName string) (string, error) {
+	if appName == "" {
+		return "", fmt.Errorf("repl: empty appName")
+	}
+
+	dir, err := os.UserConfigDir()
+	if err != nil {
+		return "", err
+	}
+
+	return filepath.Join(dir, appName, "repl-history"), nil
+}
+
+// loadHistory reads the persisted history file for appName. Returns
+// nil on any error — first run, missing file, permission denied, or
+// corrupt content all fall through silently.
+func loadHistory(appName string) []string {
+	path, err := historyPath(appName)
+	if err != nil {
+		return nil
+	}
+
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+
+	trimmed := strings.TrimRight(string(b), "\n")
+	if trimmed == "" {
+		return nil
+	}
+
+	return strings.Split(trimmed, "\n")
+}
+
+// saveHistory writes history to disk atomically: temp file then
+// rename, so a crash mid-write doesn't leave a truncated history
+// file. Best-effort — all errors are returned but callers ignore
+// them (history persistence isn't critical).
+func saveHistory(appName string, history []string) error {
+	path, err := historyPath(appName)
+	if err != nil {
+		return err
+	}
+
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+
+	tmp := path + ".tmp"
+
+	if err := os.WriteFile(tmp, []byte(strings.Join(history, "\n")+"\n"), 0o600); err != nil {
+		return err
+	}
+
+	return os.Rename(tmp, path)
 }
 
 // tealErrorHint maps a Teal error message to a friendly one-line hint,
