@@ -38,3 +38,11 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # pkg.go.dev indexes whatever version the Go module proxy has
+      # cached, and the proxy only fetches a tag on first request. Hit
+      # it here rather than waiting on some consumer's `go get` to do
+      # it, so pkg.go.dev shows the new version within minutes of the
+      # release instead of whenever. See docs/release.md.
+      - name: Trigger pkg.go.dev indexing
+        run: curl -fsSL "https://proxy.golang.org/github.com/jordanbrauer/hex/@v/${{ github.event.release.tag_name }}.info"

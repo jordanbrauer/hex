@@ -19,6 +19,8 @@ Publishing a GitHub Release with a semver tag triggers
    archives and commits it back to `main`. Homebrew's tap loader
    accepts formulas at `./`, `Formula/`, or `HomebrewFormula/`;
    hex uses the root path for a flatter layout.
+5. Pings the Go module proxy for the new tag so `pkg.go.dev` indexes
+   the release within minutes. See "Godoc indexing" below.
 
 ## Cutting a release
 
@@ -65,6 +67,27 @@ no self-signing, no notarisation.
 If hex CLI ever ships codesigned + notarised binaries, migrate the
 release pipeline to `homebrew_casks:` in `.goreleaser.yaml` and drop
 this workaround.
+
+## Godoc indexing
+
+pkg.go.dev doesn't have a publish step — it indexes whatever version
+the Go module proxy (`proxy.golang.org`) has cached, and the proxy
+only fetches a given tag the first time something requests it. Left
+alone, that first request would be whoever runs `go get` next, which
+could be minutes or weeks after a release.
+
+`.github/workflows/release.yml` closes that gap: once GoReleaser
+publishes, it hits the proxy directly for the tag that was just
+released, forcing the fetch immediately:
+
+```sh
+curl -fsSL "https://proxy.golang.org/github.com/jordanbrauer/hex/@v/vX.Y.Z.info"
+```
+
+No tokens or auth required — the proxy is a public, read-only mirror.
+If `pkg.go.dev/github.com/jordanbrauer/hex` still doesn't show the new
+version a few minutes after a release, re-run that `curl` by hand, or
+visit the package page and click **Request**.
 
 ## Installation, once released
 
