@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	lua "github.com/yuin/gopher-lua"
 
 	hexlua "github.com/jordanbrauer/hex/lua"
@@ -283,6 +284,16 @@ func runInteractive(env *hexlua.Environment, session *teal.Session, isTeal bool,
 		Evaluator:    evaluator,
 		HistoryLimit: 1000,
 	})
+
+	// Prompt color varies by mode so users can tell at a glance
+	// which language they're in:
+	//   Teal — hex's #3e8b9b (teal-tinted cyan, ships as default)
+	//   Lua  — Lua's classic navy #000080
+	if !isTeal {
+		styles := model.Styles()
+		styles.Prompt = styles.Prompt.Foreground(lipgloss.Color("#000080"))
+		model = model.SetStyles(styles)
+	}
 
 	// Inline mode (no alt-screen): the model only renders the input
 	// line via View, and pushes everything else into the terminal's
