@@ -291,3 +291,83 @@ func TestExec_nilScript(t *testing.T) {
 		t.Errorf("Exec(nil) returned nil error")
 	}
 }
+
+// -- Teal (.tl) integration -----------------------------------------------
+
+func TestExecFile_transparentlyHandlesTeal(t *testing.T) {
+	dir := t.TempDir()
+	fp := filepath.Join(dir, "greet.tl")
+
+	src := `global function greet(name: string): string
+    return "hello, " .. name
+end
+global result: string = greet("teal")
+`
+	if err := os.WriteFile(fp, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	env := lua.New()
+	defer env.Close()
+
+	if err := env.ExecFile(fp); err != nil {
+		t.Fatalf("ExecFile .tl: %v", err)
+	}
+
+	got := env.GetGlobal("result")
+	if s, ok := got.(gopherlua.LString); !ok || string(s) != "hello, teal" {
+		t.Errorf("result = %v, want 'hello, teal'", got)
+	}
+}
+
+func TestCheckFile_passesForCleanTeal(t *testing.T) {
+	dir := t.TempDir()
+	fp := filepath.Join(dir, "clean.tl")
+
+	if err := os.WriteFile(fp, []byte(`local x: number = 42
+return x
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	env := lua.New()
+	defer env.Close()
+
+	if err := env.CheckFile(fp); err != nil {
+		t.Errorf("CheckFile clean: %v", err)
+	}
+}
+
+func TestCheckFile_failsForTealTypeError(t *testing.T) {
+	dir := t.TempDir()
+	fp := filepath.Join(dir, "bad.tl")
+
+	if err := os.WriteFile(fp, []byte(`local x: number = "not a number"
+return x
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	env := lua.New()
+	defer env.Close()
+
+	if err := env.CheckFile(fp); err == nil {
+		t.Errorf("CheckFile on bad .tl returned nil; want error")
+	}
+}
+
+func TestCheckFile_luaFileParseCheck(t *testing.T) {
+	dir := t.TempDir()
+	fp := filepath.Join(dir, "clean.lua")
+
+	if err := os.WriteFile(fp, []byte(`return 1 + 2`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	env := lua.New()
+	defer env.Close()
+
+	if err := env.CheckFile(fp); err != nil {
+		t.Errorf("CheckFile .lua: %v", err)
+	}
+}

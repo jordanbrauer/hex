@@ -39,6 +39,9 @@ import (
 	"path/filepath"
 	"runtime/debug"
 	"strings"
+	"sync"
+
+	"github.com/jordanbrauer/hex/lua/teal"
 
 	lua "github.com/yuin/gopher-lua"
 	"github.com/yuin/gopher-lua/parse"
@@ -52,7 +55,9 @@ type Environment struct {
 	// an escape hatch, not the primary API.
 	L *lua.LState
 
-	closed bool
+	closed   bool
+	tealOnce sync.Once
+	tealErr  error
 }
 
 // Option configures a new Environment.
@@ -262,14 +267,89 @@ func (e *Environment) ExecString(source, name string) error {
 	return e.Exec(script)
 }
 
-// ExecFile compiles and executes a Lua file.
+// ExecFile compiles and executes a Lua or Teal file. .tl files are
+// transpiled through the embedded Teal compiler (see hex/lua/teal)
+// before being handed to gopher-lua. Teal support is lazily loaded on
+// the first .tl encountered per Environment, so pure-Lua users pay
+// nothing.
 func (e *Environment) ExecFile(path string) error {
-	script, err := CompileFile(path)
+	script, err := e.LoadFile(path)
 	if err != nil {
 		return err
 	}
 
 	return e.Exec(script)
+}
+
+// LoadFile reads path and compiles it to a Script, auto-detecting
+// Lua vs Teal by extension. Same semantics as CompileFile for .lua;
+// .tl files first run through the Teal compiler.
+func (e *Environment) LoadFile(path string) (*Script, error) {
+	if filepath.Ext(path) != ".tl" {
+		return CompileFile(path)
+	}
+
+	if err := e.ensureTeal(); err != nil {
+		return nil, err
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("lua: read %s: %w", path, err)
+	}
+
+	abs, absErr := filepath.Abs(path)
+	if absErr != nil {
+		abs = path
+	}
+
+	luaSrc, err := teal.Compile(e.L, string(data), abs)
+	if err != nil {
+		return nil, fmt.Errorf("lua: compile teal %s: %w", path, err)
+	}
+
+	return Compile(luaSrc, abs)
+}
+
+// ensureTeal lazy-loads the Teal compiler into this Environment's
+// state. sync.Once so concurrent callers don't race + repeated calls
+// are free.
+func (e *Environment) ensureTeal() error {
+	e.tealOnce.Do(func() {
+		e.tealErr = teal.Load(e.L)
+	})
+
+	return e.tealErr
+}
+
+// CheckFile runs a Lua or Teal file through validation without
+// executing it. For .lua files this parses only. For .tl files this
+// runs the Teal type-checker.
+//
+// Intended for CI (fail the build on Teal type errors) and for
+// pre-flight validation of user-supplied scripts.
+func (e *Environment) CheckFile(path string) error {
+	if filepath.Ext(path) != ".tl" {
+		_, err := CompileFile(path)
+
+		return err
+	}
+
+	if err := e.ensureTeal(); err != nil {
+		return err
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("lua: read %s: %w", path, err)
+	}
+
+	abs, absErr := filepath.Abs(path)
+	if absErr != nil {
+		abs = path
+	}
+
+	return teal.Check(e.L, string(data), abs)
 }
 
 // -- helpers ---------------------------------------------------------------
