@@ -144,13 +144,9 @@ Full detail lives in [`AGENTS.md`](./AGENTS.md). The most-cited ones:
 
 ## Known flaky tests
 
-One test is known-flaky under `-race`. Do not treat it as blocking
-unless you're specifically debugging it:
-
-- `queue/memory.TestCompetingConsumers_splitStream`
-
-If you fix it, note it in the PR and remove it from this list (and
-from the equivalent list in `AGENTS.md`).
+None at the moment. If you introduce or discover a flake, document it
+here and in `AGENTS.md` with the reproducer command so future
+contributors don't spin their wheels on it.
 
 ## Code of conduct
 
