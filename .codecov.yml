@@ -1,0 +1,53 @@
+# Codecov configuration for hex.
+#
+# Policy: Codecov reports coverage on every PR and every push to main,
+# but its status checks are advisory — they never block a merge. The
+# threshold ratchets up organically as tests are added, not by fiat.
+# The upload itself (the codecov/codecov-action step in CI) IS required
+# to pass; drift there means we lose visibility, so we surface it.
+
+codecov:
+  # Wait until CI finishes before finalising the coverage report so
+  # partial uploads don't misrepresent the state.
+  require_ci_to_pass: true
+
+  # We upload from a single matrix leg (ubuntu). One build is enough.
+  notify:
+    after_n_builds: 1
+
+coverage:
+  precision: 1
+  round: nearest
+  # The colour bar on the badge maps to this range. 60% is roughly
+  # today's aggregate; 90% is the aspirational ceiling.
+  range: "60...90"
+
+  status:
+    # Overall project coverage on main.
+    project:
+      default:
+        # informational = show the check, never block the merge.
+        informational: true
+        # Baseline against whatever main is at today. Coverage drops
+        # up to `threshold` from that baseline are tolerated.
+        target: auto
+        threshold: 2%
+
+    # Coverage of just the lines changed in a PR.
+    patch:
+      default:
+        informational: true
+        target: auto
+        threshold: 2%
+
+# PR comments summarising coverage impact.
+comment:
+  layout: "reach, diff, flags, files"
+  behavior: default
+  require_changes: false
+
+# Paths excluded from the coverage report entirely. Consumer example
+# apps live under examples/ and aren't framework code — including their
+# tests would inflate patch coverage on unrelated framework PRs.
+ignore:
+  - "examples/**"
