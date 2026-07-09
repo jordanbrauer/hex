@@ -285,12 +285,10 @@ func (e *Environment) ExecFile(path string) error {
 // Lua vs Teal by extension. Same semantics as CompileFile for .lua;
 // .tl files first run through the Teal compiler.
 func (e *Environment) LoadFile(path string) (*Script, error) {
-	if filepath.Ext(path) != ".tl" {
-		return CompileFile(path)
-	}
+	isTL := filepath.Ext(path) == ".tl"
 
-	if err := e.ensureTeal(); err != nil {
-		return nil, err
+	if !isTL {
+		return CompileFile(path)
 	}
 
 	data, err := os.ReadFile(path)
@@ -303,12 +301,27 @@ func (e *Environment) LoadFile(path string) (*Script, error) {
 		abs = path
 	}
 
-	luaSrc, err := teal.Compile(e.L, string(data), abs)
-	if err != nil {
-		return nil, fmt.Errorf("lua: compile teal %s: %w", path, err)
+	return e.LoadString(string(data), abs, true)
+}
+
+// LoadString compiles a source string to a Script, treating it as
+// Teal when isTeal is true (routed through the embedded Teal
+// compiler) or Lua otherwise.
+func (e *Environment) LoadString(source, name string, isTeal bool) (*Script, error) {
+	if !isTeal {
+		return Compile(source, name)
 	}
 
-	return Compile(luaSrc, abs)
+	if err := e.ensureTeal(); err != nil {
+		return nil, err
+	}
+
+	luaSrc, err := teal.Compile(e.L, source, name)
+	if err != nil {
+		return nil, fmt.Errorf("lua: compile teal %s: %w", name, err)
+	}
+
+	return Compile(luaSrc, name)
 }
 
 // ensureTeal lazy-loads the Teal compiler into this Environment's
@@ -329,13 +342,11 @@ func (e *Environment) ensureTeal() error {
 // Intended for CI (fail the build on Teal type errors) and for
 // pre-flight validation of user-supplied scripts.
 func (e *Environment) CheckFile(path string) error {
-	if filepath.Ext(path) != ".tl" {
+	isTL := filepath.Ext(path) == ".tl"
+
+	if !isTL {
 		_, err := CompileFile(path)
 
-		return err
-	}
-
-	if err := e.ensureTeal(); err != nil {
 		return err
 	}
 
@@ -349,7 +360,24 @@ func (e *Environment) CheckFile(path string) error {
 		abs = path
 	}
 
-	return teal.Check(e.L, string(data), abs)
+	return e.CheckString(string(data), abs, true)
+}
+
+// CheckString validates source without executing it. When isTeal is
+// true the source runs through the Teal typechecker; otherwise it
+// runs through Lua's parser.
+func (e *Environment) CheckString(source, name string, isTeal bool) error {
+	if !isTeal {
+		_, err := Compile(source, name)
+
+		return err
+	}
+
+	if err := e.ensureTeal(); err != nil {
+		return err
+	}
+
+	return teal.Check(e.L, source, name)
 }
 
 // -- helpers ---------------------------------------------------------------
