@@ -38,7 +38,10 @@ To upgrade to a newer Fennel release:
 
 ## Attribution
 
+`fennel.lua` is distributed under the MIT License. The full license
+text is in [`LICENSE`](./LICENSE) alongside this NOTICE, and the SPDX
+header at the top of `fennel.lua` records the copyright.
+
 If you build against or redistribute hex including this package, the
-MIT license terms of Fennel apply to `fennel.lua` in addition to
-hex's own license. The full license text lives in the file's SPDX
-header at the top of `fennel.lua`.
+MIT terms in `LICENSE` apply to `fennel.lua` in addition to hex's own
+license.

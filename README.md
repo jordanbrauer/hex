@@ -237,4 +237,11 @@ decision is in [`docs/adr/`](./docs/adr).
 
 ## License
 
-MIT — see [LICENSE](./LICENSE).
+hex is MIT-licensed — see [`LICENSE`](./LICENSE).
+
+Several third-party projects are vendored into the tree (the Fennel
+compiler, the Teal compiler, and the algernon-patched Lua 5.2 compat
+shims that let Teal run inside gopher-lua). Their own licenses and
+notices live alongside their source under `lua/{fennel,teal}/` and
+are indexed by [`THIRD_PARTY_NOTICES.md`](./THIRD_PARTY_NOTICES.md).
+If you redistribute hex, you must carry those notices with you.
