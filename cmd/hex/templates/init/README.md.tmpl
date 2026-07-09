@@ -29,6 +29,31 @@ go mod tidy
 go run .
 ```
 
+## Development
+
+`just dev` watches Go, template, and config files and rebuilds +
+restarts the server on change{{ if .HasFrontend }}. It also runs
+the frontend asset watcher in parallel (tailwind CLI in JS mode,
+vite in TS mode). Refresh the browser to see changes{{ end }}.
+
+Install the watcher once:
+
+```bash
+go install github.com/air-verse/air@latest
+```
+
+Then:
+
+```bash
+just dev              # watch mode (Ctrl+C to stop)
+just run              # one-shot, no watching
+just build            # produce bin/{{.BinaryName}}
+{{- if .HasFrontend }}
+just build-fe         # produce public/{css,js}/*
+just build-all        # both binary + frontend
+{{- end }}
+```
+
 ## Configuration
 
 Config is layered from three kinds of sources, in order:
