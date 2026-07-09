@@ -18,6 +18,7 @@ package lua
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 	"time"
 
@@ -25,6 +26,11 @@ import (
 
 	"github.com/jordanbrauer/hex/cache"
 )
+
+// TypeStub is the Teal .d.tl source describing the `cache` module.
+//
+//go:embed cache.d.tl
+var TypeStub string
 
 // Bindings configures the 'cache' module.
 type Bindings struct {

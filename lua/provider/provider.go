@@ -106,6 +106,8 @@ func (p *Provider) installConfigModule(app provider.Application) {
 
 	bindings := &configlua.Bindings{Store: store}
 
+	p.env.SetType("config", configlua.TypeStub)
+
 	p.env.PreloadModule("config", func(L *glua.LState) int {
 		return bindings.Loader(L)
 	})
@@ -115,6 +117,8 @@ func (p *Provider) installConfigModule(app provider.Application) {
 // environment is captured from app.Environment() at install time.
 func (p *Provider) installEnvModule(app provider.Application) {
 	bindings := &envlua.Bindings{Environment: app.Environment()}
+
+	p.env.SetType("env", envlua.TypeStub)
 
 	p.env.PreloadModule("env", func(L *glua.LState) int {
 		return bindings.Loader(L)
@@ -128,6 +132,8 @@ func (p *Provider) installEnvModule(app provider.Application) {
 func (p *Provider) installEventsModule(app provider.Application) {
 	bindings := &eventslua.Bindings{Emitter: app}
 
+	p.env.SetType("events", eventslua.TypeStub)
+
 	p.env.PreloadModule("events", func(L *glua.LState) int {
 		return bindings.Loader(L)
 	})
@@ -138,6 +144,8 @@ func (p *Provider) installEventsModule(app provider.Application) {
 // the module is stateless.
 func (p *Provider) installLogModule() {
 	bindings := &loglua.Bindings{}
+
+	p.env.SetType("log", loglua.TypeStub)
 
 	p.env.PreloadModule("log", func(L *glua.LState) int {
 		return bindings.Loader(L)

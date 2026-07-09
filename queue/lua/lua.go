@@ -19,12 +19,18 @@ package lua
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 
 	glua "github.com/yuin/gopher-lua"
 
 	"github.com/jordanbrauer/hex/queue"
 )
+
+// TypeStub is the Teal .d.tl source describing the `queue` module.
+//
+//go:embed queue.d.tl
+var TypeStub string
 
 // Bindings configures the 'queue' module.
 type Bindings struct {

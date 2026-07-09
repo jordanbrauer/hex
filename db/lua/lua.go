@@ -48,6 +48,7 @@ package lua
 import (
 	"context"
 	"database/sql"
+	_ "embed"
 	"errors"
 	"fmt"
 	"sync"
@@ -55,6 +56,14 @@ import (
 
 	glua "github.com/yuin/gopher-lua"
 )
+
+// TypeStub is the Teal .d.tl source describing the `db` module's
+// shape. hex/db/provider passes it to *hex/lua.Environment.SetType
+// so Teal-mode REPL sessions and .tl scripts can require("db")
+// without type errors.
+//
+//go:embed db.d.tl
+var TypeStub string
 
 // Bindings configures the 'db' module. Constructed and installed by
 // hex/db/lua/provider; callers wiring the module manually build one

@@ -14,10 +14,16 @@
 package lua
 
 import (
+	_ "embed"
 	"fmt"
 
 	glua "github.com/yuin/gopher-lua"
 )
+
+// TypeStub is the Teal .d.tl source describing the `events` module.
+//
+//go:embed events.d.tl
+var TypeStub string
 
 // Emitter is the small surface events.Bus (and *hex.App) expose to
 // this module. Any type with Emit(event, data ...any) error works.

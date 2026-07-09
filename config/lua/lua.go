@@ -24,12 +24,18 @@
 package lua
 
 import (
+	_ "embed"
 	"fmt"
 
 	glua "github.com/yuin/gopher-lua"
 
 	"github.com/jordanbrauer/hex/config"
 )
+
+// TypeStub is the Teal .d.tl source describing the `config` module.
+//
+//go:embed config.d.tl
+var TypeStub string
 
 // Bindings configures the 'config' module.
 type Bindings struct {

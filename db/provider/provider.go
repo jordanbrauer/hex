@@ -111,6 +111,8 @@ func (p *Provider) installLuaModule(app provider.Application, dbBinding string) 
 
 	bindings := &dblua.Bindings{}
 
+	env.SetType("db", dblua.TypeStub)
+
 	env.PreloadModule("db", func(L *glua.LState) int {
 		if bindings.DB == nil {
 			db, err := container.Make[*sql.DB](app, dbBinding)
