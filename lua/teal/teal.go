@@ -19,6 +19,7 @@ import (
 	"embed"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -113,6 +114,12 @@ func Compile(L *lua.LState, source, filename string) (string, error) {
 // (correct for scripts, wrong for REPLs).
 type Session struct {
 	L *lua.LState
+
+	// typesDir is the temp directory where module type stubs
+	// (.d.tl files) are extracted so Teal's require() resolution
+	// finds them via package.path. Populated on demand by
+	// AddTypeStub; cleaned up by Close.
+	typesDir string
 }
 
 // NewSession initialises a Teal env stashed on L under a private
@@ -146,6 +153,57 @@ func newSession(L *lua.LState, lax bool) (*Session, error) {
 	}
 
 	return &Session{L: L}, nil
+}
+
+// AddTypeStub writes a Teal .d.tl file for moduleName into the
+// session's private types directory (created on first call) and
+// prepends the directory to package.path so Teal's require()
+// resolution finds it.
+//
+// Callers typically pass the source verbatim from
+// *hex/lua.Environment.Types() — hex/lua/repl.Run does this
+// automatically for Teal sessions.
+func (s *Session) AddTypeStub(moduleName, source string) error {
+	if s.typesDir == "" {
+		tmp, err := os.MkdirTemp("", "hex-teal-types-*")
+		if err != nil {
+			return fmt.Errorf("teal: create types dir: %w", err)
+		}
+
+		s.typesDir = tmp
+
+		// Prepend the temp dir to package.path so both .d.tl and
+		// .tl lookups find files there before falling through to
+		// the Lua defaults.
+		s.L.SetGlobal("_hex_teal_types_dir", lua.LString(tmp))
+
+		err = s.L.DoString(`
+			package.path = _hex_teal_types_dir .. "/?.d.tl;" ..
+			               _hex_teal_types_dir .. "/?.tl;" ..
+			               package.path
+			_hex_teal_types_dir = nil
+		`)
+		if err != nil {
+			return fmt.Errorf("teal: adjust package.path: %w", err)
+		}
+	}
+
+	path := filepath.Join(s.typesDir, moduleName+".d.tl")
+
+	return os.WriteFile(path, []byte(source), 0o600)
+}
+
+// Close removes the session's private types directory. Safe to call
+// multiple times.
+func (s *Session) Close() error {
+	if s.typesDir == "" {
+		return nil
+	}
+
+	err := os.RemoveAll(s.typesDir)
+	s.typesDir = ""
+
+	return err
 }
 
 // Compile transpiles Teal source using the session's persistent env,

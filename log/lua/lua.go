@@ -19,10 +19,17 @@
 package lua
 
 import (
+	_ "embed"
+
 	glua "github.com/yuin/gopher-lua"
 
 	hexlog "github.com/jordanbrauer/hex/log"
 )
+
+// TypeStub is the Teal .d.tl source describing the `log` module.
+//
+//go:embed log.d.tl
+var TypeStub string
 
 // Bindings is intentionally empty — the log module has no state to
 // carry (slog.Default is a global). The type exists for symmetry

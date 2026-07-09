@@ -15,10 +15,17 @@
 package lua
 
 import (
+	_ "embed"
+
 	glua "github.com/yuin/gopher-lua"
 
 	"github.com/jordanbrauer/hex/env"
 )
+
+// TypeStub is the Teal .d.tl source describing the `env` module.
+//
+//go:embed env.d.tl
+var TypeStub string
 
 // Bindings configures the 'env' module. Environment is captured at
 // module install time — usually from *hex.App.Environment() —

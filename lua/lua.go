@@ -55,6 +55,11 @@ type Environment struct {
 	// an escape hatch, not the primary API.
 	L *lua.LState
 
+	// types maps module name to its Teal .d.tl source. Populated via
+	// SetType; read by hex/lua/teal.Session on session init so
+	// require("name") in Teal source finds the module's type signature.
+	types map[string]string
+
 	closed   bool
 	tealOnce sync.Once
 	tealErr  error
@@ -152,6 +157,37 @@ func (e *Environment) Close() error {
 // detail so consumers do not need to type-assert.
 func (e *Environment) PreloadModule(name string, loader lua.LGFunction) {
 	e.L.PreloadModule(name, loader)
+}
+
+// SetType registers a Teal .d.tl source describing the shape of a
+// module. hex/lua/teal.Session reads these at session init and
+// exposes them via package.path so require("name") typechecks in
+// Teal source.
+//
+// This is compile-time metadata only — it has no effect on the
+// runtime module (registered via PreloadModule) and is silently
+// ignored when running Lua directly (Lua doesn't typecheck).
+func (e *Environment) SetType(moduleName, tealSource string) {
+	if e.types == nil {
+		e.types = map[string]string{}
+	}
+
+	e.types[moduleName] = tealSource
+}
+
+// Types returns a copy of the registered type stubs. Consumers who
+// want the underlying map (to mutate) should use SetType.
+func (e *Environment) Types() map[string]string {
+	if e.types == nil {
+		return nil
+	}
+
+	out := make(map[string]string, len(e.types))
+	for k, v := range e.types {
+		out[k] = v
+	}
+
+	return out
 }
 
 // SetGlobal installs value as a Lua global. Supported Go types: string,

@@ -92,6 +92,8 @@ func (p *Provider) installLuaModule(app provider.Application) {
 
 	bindings := &cachelua.Bindings{Cache: p.cache}
 
+	env.SetType("cache", cachelua.TypeStub)
+
 	env.PreloadModule("cache", func(L *glua.LState) int {
 		return bindings.Loader(L)
 	})

@@ -19,6 +19,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 
 	lua "github.com/yuin/gopher-lua"
@@ -122,6 +123,32 @@ func Run(opts Options) error {
 			return fmt.Errorf("repl: teal session: %w", err)
 		}
 
+		defer session.Close()
+
+		// Propagate any type stubs registered on the environment
+		// (via env.SetType, called by framework providers when they
+		// install their Lua modules) so require("db"), require("cache"),
+		// etc. typecheck in Teal source.
+		types := env.Types()
+		for name, source := range types {
+			if err := session.AddTypeStub(name, source); err != nil {
+				return fmt.Errorf("repl: register type %q: %w", name, err)
+			}
+		}
+
+		// Pre-declare each registered module as a global on the
+		// session's persistent env. This works around Teal's
+		// chunk-local scope for locals: `local db = require("db")`
+		// on one line vanishes before the next line. Global
+		// declarations persist across chunks, so `db.query(...)` on
+		// any subsequent line typechecks against the .d.tl stub and
+		// runs against the PreloadModule'd runtime module.
+		//
+		// Deterministic order keeps error messages stable.
+		if err := preloadTypedGlobals(env, session, types); err != nil {
+			return fmt.Errorf("repl: preload globals: %w", err)
+		}
+
 		tealSession = session
 	}
 
@@ -132,8 +159,9 @@ func Run(opts Options) error {
 	}
 
 	if isTeal {
-		fmt.Fprintln(opts.Out, "note: Teal forbids implicit globals. Use `global x: T = v` to declare persistent variables;")
-		fmt.Fprintln(opts.Out, "      locals do not carry across REPL lines. Use `--lua` for looser Lua semantics.")
+		fmt.Fprintln(opts.Out, "note: framework modules (db, cache, config, log, env, events, queue) are typed globals.")
+		fmt.Fprintln(opts.Out, "      Your own vars need `global x: T = v` to persist across lines (locals die with the chunk).")
+		fmt.Fprintln(opts.Out, "      Pass `--mode lua` for looser Lua semantics.")
 	}
 
 	prompt := opts.AppName + "(" + opts.Mode.String() + ")> "
@@ -193,6 +221,42 @@ func tealErrorHint(msg string) string {
 	default:
 		return ""
 	}
+}
+
+// preloadTypedGlobals emits `global <name> = require("<name>")` for
+// each registered module, evaluated inside the Teal session so both
+// the compile-time type table and the runtime _G[name] are
+// populated. Callers can then use each module by bare name (db,
+// cache, log, ...) without a require() dance.
+func preloadTypedGlobals(env *hexlua.Environment, session *teal.Session, types map[string]string) error {
+	// Stable ordering by name so any error surfaces the same module
+	// first every run.
+	names := make([]string, 0, len(types))
+	for name := range types {
+		names = append(names, name)
+	}
+
+	sort.Strings(names)
+
+	for _, name := range names {
+		src := fmt.Sprintf("global %s = require(%q)", name, name)
+
+		luaSrc, err := session.Compile(src, "<hex:preload>")
+		if err != nil {
+			return fmt.Errorf("compile %q: %w", name, err)
+		}
+
+		script, err := hexlua.Compile(luaSrc, "<hex:preload>")
+		if err != nil {
+			return fmt.Errorf("assemble %q: %w", name, err)
+		}
+
+		if err := env.Exec(script); err != nil {
+			return fmt.Errorf("exec %q: %w", name, err)
+		}
+	}
+
+	return nil
 }
 
 // isExitDirective recognises the shell-conventional "exit" / "quit"

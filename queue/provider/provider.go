@@ -68,6 +68,8 @@ func (p *Provider) installLuaModule(app provider.Application) {
 
 	bindings := &queuelua.Bindings{Queue: p.q}
 
+	env.SetType("queue", queuelua.TypeStub)
+
 	env.PreloadModule("queue", func(L *glua.LState) int {
 		return bindings.Loader(L)
 	})
