@@ -4,7 +4,7 @@
 // Each TOML file is a namespace. A file named "database.toml" creates a
 // namespace called "database"; its keys are addressed as
 // `config.String("database.<key.path>")`. This mirrors the pattern used in
-// production by finch-cli and finch-bot.
+// production by real Go services.
 //
 // Priority order for each namespace (highest wins):
 //

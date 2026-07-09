@@ -5,7 +5,7 @@
 
 ## Context
 
-Discovered while investigating [pi-6u2](https://github.com/jordanbrauer/hex/issues) (the finch-cli bug where `app.New()` in tests silently opened the real on-disk SQLite DB): tests, dev runs, and released binaries all boot the same code path but need different drivers. The traditional finch fix would have been a per-project `testutil.NewTestApp(t)` that rebinds specific providers. But this only helps consumers who know to use it, and the trap is silent.
+Discovered while investigating a bug where `app.New()` in tests silently opened the real on-disk SQLite DB: tests, dev runs, and released binaries all boot the same code path but need different drivers. The traditional fix would have been a per-project `testutil.NewTestApp(t)` that rebinds specific providers. But this only helps consumers who know to use it, and the trap is silent.
 
 We wanted something better: bake the notion of "what environment am I running in" into the framework so:
 

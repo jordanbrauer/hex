@@ -1,6 +1,6 @@
 # hex
 
-An opinionated Go application framework — like Laravel, Phoenix, or Hugo — that standardizes the foundational patterns shared across finch-api/cli and finch-api/bot. Fresh rewrite, informed by both codebases.
+An opinionated Go application framework — like Laravel, Phoenix, or Hugo — that standardises the foundational patterns needed to build long-running Go services and CLIs. Fresh rewrite, informed by patterns extracted from real production Go codebases.
 
 hex is not just a library you import. It's a **framework with a CLI** that scaffolds new projects, generates boilerplate, and enforces architectural conventions from day one.
 
@@ -24,39 +24,39 @@ hex follows the same playbook as Laravel (`artisan`), Phoenix (`mix phx.gen`), H
 
 ### In scope
 
-| Package | What | Status in CLI | Status in Bot |
-|---|---|---|---|
-| `hex` (root) | App kernel, bootstrap orchestration | `app/app.go` + `app/bootstrap.go` | `bot/bot.go` + `bot/bootstrap.go` |
-| `hex/container` | IoC container (Bind, Singleton, Make, Must) | `lib/ioc/container.go` | `lib/ioc/container.go` |
-| `hex/provider` | Service provider interface + registry lifecycle | `lib/provider/*.go` | `lib/provider/*.go` |
-| `hex/events` | Typed event bus (pub/sub) | ❌ not present | `lib/events/bus.go` |
-| `hex/db` | Database connection + migration runner | `db/connection.go` (SQLite) | `db/connection.go` (Postgres) |
-| `hex/config` | Config loading (files + env + embedded defaults) | `config/repository.go` (Viper + TOML) | `config/config.go` (Viper + YAML + env) |
-| `hex/build` | Version/commit/time via ldflags | `finch/build.go` | `build/info.go` + `build/init.go` |
-| `hex/log` | Structured logging setup | `log/log.go` (charmbracelet/log wrapper) | charmbracelet/log (direct) |
-| `hex/cli` | Cobra root command scaffolding + common flags | `cli/root.go` | `cli/root.go` |
-| `hex/cron` | Scheduled job runner | ❌ not present | `lib/cron/*.go` |
-| `hex/cache` | Multi-backend cache (memcached, redis/valkey, memory) | ❌ not present | ❌ not present |
-| `hex/disk` | Laravel-style multi-backend filesystem (`local` first; `s3`/`minio`/`gcs` as subpackages) | `util/disk/*.go` | ❌ not present |
-| `hex/tui` | Terminal renderer, markup, console, styles | `tui/{styles,markup,renderer,console,components,wizard}` | ❌ not present |
-| `hex/web` | HTTP server (echo) with standard middleware + graceful shutdown | ❌ not present | `web/*.go` + `bot/provider/web.go` |
-| `hex/lua` | Lua runtime (gopher-lua). No bindings, no plugin system (ADR-0007) | `lib/lua/*.go` | ❌ not present |
-| `hex/queue` | Generic message queue interface + Jobs layer (ADR-0009). Backends: memory, sqlite; later sqs/rabbitmq/kafka | ❌ not present | ❌ not present |
-| `hex/pool` | Worker pool for bounded in-process concurrency (wraps alitto/pond, ADR-0010) | ❌ not present | ❌ not present |
-| `hex/policy` | Authorisation via Casbin — model + adapter, ACL/RBAC/ABAC (ADR-0011). Adapters: memory, file; later sql | ❌ not present | ❌ not present |
-| `hex/i18n` | GNU gettext-compatible i18n via gotext + PO files (ADR-0012). Multi-locale Translator + package-level convenience | ❌ not present | ❌ not present |
-| `hex/featureflag` | Feature flags via go-feature-flag (ADR-0013). Retrievers: file, embed.FS | ❌ not present | ❌ not present |
-| `hex/clock` | Injectable time source for testable code | ❌ not present | ❌ not present |
-| `hex/id` | UUID v4/v7 + ULID + KSUID with one consistent surface | ❌ not present | ❌ not present |
-| `hex/errors` | Typed errors with codes + HTTP status mapping | ❌ not present | ❌ not present |
-| `hex/hash` | Password hashing (argon2id) + HMAC signature helpers | ❌ not present | ❌ not present |
-| `hex/retry` | Generic exponential-backoff retry helper | ❌ not present | ❌ not present |
-| `hex/ratelimit` | Token-bucket rate limiter (wraps x/time/rate) | ❌ not present | ❌ not present |
-| `hex/httpx` | Outbound HTTP client with retries, backoff, timeout, hex/log integration | ❌ not present | ❌ not present |
-| `hex/validate` | Struct/request validation via zog (Zod-style API) | ❌ not present | ❌ not present |
-| `hex/telemetry` | OpenTelemetry setup (tracer + metrics + log bridge) | ❌ not present | ❌ not present |
-| `hex/bdd` | BDD test runner via gobdd; Gherkin `.feature` support + embed.FS (ADR-0015) | ❌ not present | ❌ not present |
-| **`cmd/hex`** | **Scaffolding CLI (`hex init`, `hex make:*`)** | ❌ manual setup | ❌ manual setup |
+| Package | What |
+|---|---|
+| `hex` (root) | App kernel, bootstrap orchestration |
+| `hex/container` | IoC container (Bind, Singleton, Make, Must) |
+| `hex/provider` | Service provider interface + registry lifecycle |
+| `hex/events` | Typed event bus (pub/sub) |
+| `hex/db` | Database connection + migration runner |
+| `hex/config` | Config loading (files + env + embedded defaults) |
+| `hex/build` | Version/commit/time via ldflags |
+| `hex/log` | Structured logging setup |
+| `hex/cli` | Cobra root command scaffolding + common flags |
+| `hex/cron` | Scheduled job runner |
+| `hex/cache` | Multi-backend cache (memcached, redis/valkey, memory) |
+| `hex/disk` | Laravel-style multi-backend filesystem (`local` first; `s3`/`minio`/`gcs` as subpackages) |
+| `hex/tui` | Terminal renderer, markup, console, styles |
+| `hex/web` | HTTP server (echo) with standard middleware + graceful shutdown |
+| `hex/lua` | Lua runtime (gopher-lua). No bindings, no plugin system (ADR-0007) |
+| `hex/queue` | Generic message queue interface + Jobs layer (ADR-0009). Backends: memory, sqlite; later sqs/rabbitmq/kafka |
+| `hex/pool` | Worker pool for bounded in-process concurrency (wraps alitto/pond, ADR-0010) |
+| `hex/policy` | Authorisation via Casbin — model + adapter, ACL/RBAC/ABAC (ADR-0011). Adapters: memory, file; later sql |
+| `hex/i18n` | GNU gettext-compatible i18n via gotext + PO files (ADR-0012). Multi-locale Translator + package-level convenience |
+| `hex/featureflag` | Feature flags via go-feature-flag (ADR-0013). Retrievers: file, embed.FS |
+| `hex/clock` | Injectable time source for testable code |
+| `hex/id` | UUID v4/v7 + ULID + KSUID with one consistent surface |
+| `hex/errors` | Typed errors with codes + HTTP status mapping |
+| `hex/hash` | Password hashing (argon2id) + HMAC signature helpers |
+| `hex/retry` | Generic exponential-backoff retry helper |
+| `hex/ratelimit` | Token-bucket rate limiter (wraps x/time/rate) |
+| `hex/httpx` | Outbound HTTP client with retries, backoff, timeout, hex/log integration |
+| `hex/validate` | Struct/request validation via zog (Zod-style API) |
+| `hex/telemetry` | OpenTelemetry setup (tracer + metrics + log bridge) |
+| `hex/bdd` | BDD test runner via gobdd; Gherkin `.feature` support + embed.FS (ADR-0015) |
+| **`cmd/hex`** | **Scaffolding CLI (`hex init`, `hex make:*`)** |
 
 ### Out of scope
 
@@ -68,7 +68,7 @@ These stay in consumer apps — they're app-specific, not framework-generic:
 - TUI components (CLI-specific bubbletea)
 - Lua plugin system (CLI-specific)
 - Slack/GitHub integrations (bot-specific)
-- API client wrappers (CLI-specific Finch SDK usage)
+- API client wrappers (app-specific SDK usage)
 
 ## Architecture
 
@@ -86,13 +86,13 @@ These stay in consumer apps — they're app-specific, not framework-generic:
                                                                    ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │                        consumer app (generated)                     │
-│  (finch-cli, finch-bot, or any future Go service)                   │
+│  (a CLI tool, a long-running service, or anything in between)       │
 │                                                                     │
 │  main.go                                                            │
 │  ├── hex.New()              ← create app kernel                     │
 │  ├── app.Register(...)      ← add app-specific providers            │
 │  ├── app.Bootstrap(ctx)     ← Register → Boot all providers         │
-│  ├── cli.Root("finch", app) ← Cobra root with common flags         │
+│  ├── cli.Root("myapp", app) ← Cobra root with common flags         │
 │  ├── root.Execute()         ← run                                   │
 │  └── app.Shutdown(ctx)      ← reverse-order provider shutdown       │
 └─────────────────────────────────────────────────────────────────────┘
@@ -632,7 +632,7 @@ type Config struct {
     DefaultsDir string          // subdirectory within embed.FS
 
     // Env var mapping (YAML file: config key → env var name)
-    // e.g. database.dsn: FINCH_DATABASE_DSN
+    // e.g. database.dsn: MYAPP_DATABASE_DSN
     EnvMap embed.FS             // embedded env.yaml
     EnvMapFile string           // path within embed.FS (e.g. "env.yaml")
 
@@ -655,7 +655,7 @@ func (s *Store) Viper() *viper.Viper                    // escape hatch
 
 **Priority order (highest wins):** env vars (mapped via env.yaml) → user config files (TOML) → embedded defaults (TOML).
 
-**Convention:** App config is always TOML. Env var mapping is always a YAML file (`config/env.yaml`) that declaratively maps config keys to environment variable names. This is the pattern from finch-bot — the YAML file is not application config, it's a binding declaration.
+**Convention:** App config is always TOML. Env var mapping is always a YAML file (`config/env.yaml`) that declaratively maps config keys to environment variable names. The YAML file is not application config — it's a binding declaration.
 
 ### `hex/build` — Build Info
 
@@ -793,121 +793,6 @@ myapp/
 ```
 
 This is the directory structure `hex init` creates. Generators place files into these directories by convention — you never have to tell them where things go.
-
-## Consumer Migration Example
-
-### Before (finch-cli today)
-
-```
-finch-cli/
-├── app/
-│   ├── app.go              ← kernel (custom)
-│   ├── bootstrap.go        ← provider wiring
-│   └── provider/*.go       ← service providers
-├── lib/
-│   ├── ioc/container.go    ← IoC container (duplicated from bot)
-│   └── provider/*.go       ← lifecycle interfaces (duplicated)
-├── config/repository.go    ← config loading
-├── db/connection.go        ← SQLite setup
-├── log/log.go              ← logging
-└── main.go
-```
-
-### After (finch-cli on hex)
-
-```
-finch-cli/
-├── cmd/
-│   └── finch/
-│       └── main.go         ← hex.New() + providers + cli.Root()
-├── provider/               ← app-specific providers (import hex/provider)
-│   ├── boot.go             ← ordered registration
-│   ├── database.go
-│   ├── session.go
-│   ├── token.go
-│   └── ...
-├── domain/                 ← unchanged
-├── infrastructure/         ← unchanged
-├── cli/                    ← unchanged (commands)
-├── db/
-│   └── migrations/         ← app's own migrations (embed.FS)
-├── config/
-│   └── defaults/           ← embedded TOML defaults
-├── build/
-│   └── build.go
-├── Makefile                ← standardized targets from hex convention
-└── go.mod
-```
-
-**Deleted from CLI:** `app/` (entire directory — kernel + bootstrap replaced by hex + `provider/boot.go`), `lib/ioc/`, `lib/provider/`, `log/log.go`, `config/repository.go`, `db/connection.go` (open/migrate logic).
-
-**Deleted from bot:** `lib/ioc/`, `lib/provider/`, `lib/events/`, `bot/bot.go` (kernel), `bot/bootstrap.go` (replaced by `provider/boot.go`), `build/init.go` (git exec at init), `db/connection.go` (connect/migrate logic).
-
-### After (main.go)
-
-```go
-package main
-
-import (
-    "context"
-    "os"
-
-    "github.com/jordanbrauer/hex"
-    hexcli "github.com/jordanbrauer/hex/cli"
-    hexlog "github.com/jordanbrauer/hex/log"
-
-    "finch/cli/auth"
-    "finch/cli/token"
-    "finch/cli/plugin"
-    "finch/provider"
-)
-
-func main() {
-    hexlog.Init()
-
-    app := hex.New()
-    provider.Boot(app)
-
-    if err := app.Bootstrap(context.Background()); err != nil {
-        hexlog.Fatal("bootstrap failed", "error", err)
-    }
-    defer app.Shutdown(context.Background())
-
-    root := hexcli.Root("finch", "Finch developer platform CLI", app)
-    root.AddCommand(
-        auth.New(app),
-        token.New(app),
-        plugin.New(app),
-        hexcli.Version(),
-    )
-
-    if err := root.Execute(); err != nil {
-        os.Exit(1)
-    }
-}
-```
-
-```go
-// provider/boot.go — same shape as app/bootstrap.go (CLI) and bot/bootstrap.go (bot)
-package provider
-
-import "github.com/jordanbrauer/hex"
-
-func Boot(app *hex.App) {
-    // Core
-    app.Register(&Database{}, &Session{})
-
-    // API
-    app.Register(&API{})
-
-    // Domain services
-    app.Register(&Token{}, &Auth{}, &Organization{}, &Application{})
-
-    // Plugins
-    app.Register(&Lua{})
-    // hex:providers
-}
-```
 
 ## Dependencies
 
@@ -1056,7 +941,7 @@ Laravel-style multi-backend filesystem (ADR-0008). Interface + `local` backend i
 
 ### Phase 8 — TUI
 
-Styles + markup + renderer + console helpers ported from finch-cli's `tui/` tree.
+Styles + markup + renderer + console helpers for CLIs and TUIs.
 
 **Package:** `hex/tui`, and subpackages as needed (`tui/markup`, `tui/renderer`, `tui/styles`).
 **Tests:** Golden-file rendering, style token resolution.
@@ -1148,13 +1033,13 @@ The scaffolding CLI itself. This is the user-facing `hex` binary that generates 
 
 **Tests:** Golden file tests — run each generator, compare output against checked-in snapshots. `UPDATE_SNAPSHOTS=true go test ./...` to refresh.
 
-### Phase 20 — Migrate finch-cli
+### Phase 20 — Migrate the first real consumer
 
-First real consumer. Replace `app/`, `lib/ioc`, `lib/provider`, `config/repository.go`, `db/connection.go`, `log/log.go` with hex imports and the canonical project structure. This validates both the library API and the generated structure against a real, complex app.
+Pick an existing Go CLI/service and rebuild it on hex. Replaces its custom kernel, IoC container, provider lifecycle, config loading, db bootstrap, and logging setup with hex imports and the canonical project structure. Validates both the library API and the generated structure against a real, complex app.
 
-### Phase 21 — Migrate finch-bot
+### Phase 21 — Migrate the second real consumer
 
-Second consumer. Replace `lib/ioc`, `lib/provider`, `lib/events`, `bot/bot.go`, `bot/bootstrap.go`, `build/*.go`, `db/connection.go` with hex imports. Validates that the same framework serves both a CLI tool and a long-running service.
+Pick a different-shape Go service (long-running rather than short-lived) and repeat. Validates that the same framework serves both a CLI tool and a long-running service.
 
 ## Open Questions
 

@@ -11,7 +11,7 @@ func TestPackageLevel_zeroValuesWhenNoDefault(t *testing.T) {
 	// Ensure clean slate.
 	config.SetDefault(nil)
 
-	if got := config.String("finch.log.level"); got != "" {
+	if got := config.String("myapp.log.level"); got != "" {
 		t.Errorf("String w/o default = %q, want empty", got)
 	}
 
@@ -57,8 +57,8 @@ func TestPackageLevel_delegatesToDefault(t *testing.T) {
 		t.Errorf("Int = %d, want 8080", got)
 	}
 
-	if got := config.String("finch.log.level"); got != "info" {
-		t.Errorf("String finch.log.level = %q, want info", got)
+	if got := config.String("myapp.log.level"); got != "info" {
+		t.Errorf("String myapp.log.level = %q, want info", got)
 	}
 
 	if !config.Has("server.port") {

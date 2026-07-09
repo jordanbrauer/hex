@@ -8,4 +8,4 @@ We rejected rolling our own (goroutines + a semaphore channel) because pond's dy
 
 ## Not integrated into hex/queue yet
 
-Queue subscriptions currently spawn one goroutine per subscription. Adding a per-subscription concurrency knob (`SubscribeOptions{Concurrency: N}`) that uses hex/pool is a natural next step, but we defer it until we see the actual access pattern in the finch-cli / finch-bot migrations. Consumers who want concurrent queue handling today wrap their handler in a `pool.Submit` call themselves.
+Queue subscriptions currently spawn one goroutine per subscription. Adding a per-subscription concurrency knob (`SubscribeOptions{Concurrency: N}`) that uses hex/pool is a natural next step, but we defer it until real consumers surface the actual access pattern. Consumers who want concurrent queue handling today wrap their handler in a `pool.Submit` call themselves.

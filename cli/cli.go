@@ -19,11 +19,11 @@
 //	defer app.Shutdown(ctx)
 //
 //	root := hexcli.Root(hexcli.RootOptions{
-//	    Name:  "finch",
-//	    Short: "Finch developer platform CLI",
+//	    Name:  "myapp",
+//	    Short: "my hex-powered CLI",
 //	    App:   app,
 //	})
-//	root.AddCommand(hexcli.Version(hexcli.VersionOptions{App: "finch"}))
+//	root.AddCommand(hexcli.Version(hexcli.VersionOptions{App: "myapp"}))
 //	root.AddCommand(cmd.Auth(app), cmd.Token(app))
 //	os.Exit(hexcli.Execute(root))
 package cli
@@ -63,7 +63,8 @@ type RootOptions struct {
 	DefaultLogLevel string
 
 	// SilenceUsage and SilenceErrors mirror the Cobra fields of the same
-	// name. Default: both true, matching finch-cli and finch-bot behaviour.
+	// name. Default: both true — hex apps generally render their own
+	// errors and don't want Cobra's usage dump on every failed run.
 	// Set the *Enable variants to force-enable one you want back.
 	EnableUsageOnError bool
 	EnableErrorPrint   bool
@@ -173,7 +174,7 @@ func AddEnvFlag(cmd *cobra.Command) {
 
 // Execute runs root and returns a suggested process exit code: 0 on
 // success, 1 on any non-nil error. Consumers with richer exit-code logic
-// (see finch-cli's err2code) should write their own instead.
+// should write their own instead.
 func Execute(root *cobra.Command) int {
 	if err := root.Execute(); err != nil {
 		// Errors are already printed by Cobra when SilenceErrors is false.

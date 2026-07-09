@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-// Package-level convenience mirrors the finch-cli / finch-bot pattern where
+// Package-level convenience mirrors the pattern where
 // callers do `config.String("database.dsn")` without threading a *Store
 // around. The default store is set by SetDefault (typically from a service
 // provider during Register) and read atomically so concurrent access from

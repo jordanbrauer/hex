@@ -335,7 +335,7 @@ then, LSP servers often use tree-sitter internally.
    Teal-declared identifier, but acceptable.
 
 4. **Cross-compilation story?**
-   Modern hex/finch users cross-compile to Linux from Mac all the
+   Many hex users cross-compile to Linux from Mac all the
    time. Cgo-with-C-grammars complicates this. Do we ship a
    pure-Go fallback path that disables highlighting on cross-compile
    targets without a cgo toolchain?
