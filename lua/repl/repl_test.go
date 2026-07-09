@@ -2,11 +2,87 @@ package repl
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
 	hexlua "github.com/jordanbrauer/hex/lua"
 )
+
+// withConfigDir points os.UserConfigDir at a temp dir for the
+// duration of the test, so history persistence tests don't touch the
+// user's real config directory.
+func withConfigDir(t *testing.T) string {
+	t.Helper()
+
+	dir := t.TempDir()
+
+	// os.UserConfigDir reads XDG_CONFIG_HOME on Linux and
+	// HOME/Library/Application Support on macOS. Set both so tests
+	// work regardless of platform.
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("HOME", dir)
+
+	return dir
+}
+
+func TestSaveLoadHistory_roundtrip(t *testing.T) {
+	withConfigDir(t)
+
+	want := []string{"print(1)", "global x = 2", "db.query('...')"}
+
+	if err := saveHistory("myapp", want); err != nil {
+		t.Fatalf("saveHistory: %v", err)
+	}
+
+	got := loadHistory("myapp")
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("round-trip mismatch:\n got: %v\nwant: %v", got, want)
+	}
+}
+
+func TestLoadHistory_missingReturnsNil(t *testing.T) {
+	withConfigDir(t)
+
+	if got := loadHistory("never-existed"); got != nil {
+		t.Errorf("missing file should load as nil, got %v", got)
+	}
+}
+
+func TestSaveHistory_atomicRenameLeavesNoTemp(t *testing.T) {
+	dir := withConfigDir(t)
+
+	if err := saveHistory("myapp", []string{"one", "two"}); err != nil {
+		t.Fatalf("saveHistory: %v", err)
+	}
+
+	tmp := filepath.Join(dir, "myapp", "repl-history.tmp")
+	if _, err := os.Stat(tmp); !os.IsNotExist(err) {
+		t.Errorf("temp file should have been renamed, still present at %s", tmp)
+	}
+}
+
+func TestSaveHistory_createsParentDir(t *testing.T) {
+	withConfigDir(t)
+
+	if err := saveHistory("deeply/nested/appname", []string{"x"}); err != nil {
+		t.Fatalf("saveHistory should create parent dirs: %v", err)
+	}
+
+	if got := loadHistory("deeply/nested/appname"); len(got) != 1 || got[0] != "x" {
+		t.Errorf("got %v, want [x]", got)
+	}
+}
+
+func TestSaveHistory_emptyAppNameErrors(t *testing.T) {
+	withConfigDir(t)
+
+	if err := saveHistory("", []string{"x"}); err == nil {
+		t.Errorf("saveHistory with empty appName should error")
+	}
+}
 
 // run is a tiny helper that wires stdin/stdout/stderr buffers and
 // runs the REPL in the requested mode against a bare environment.
