@@ -1,17 +1,24 @@
 // Package provider is the default hex/lua service provider.
 //
-// It constructs a shared *lua.Environment during Register and binds it
-// into the container under "lua" so other providers can resolve it
-// and contribute modules, globals, or preloaded scripts:
+// It constructs a shared *lua.Environment during Register and binds
+// it into the container under "lua" so other providers can resolve
+// it and contribute modules, globals, or preloaded scripts:
 //
 //	// In another provider's Register:
 //	env, _ := container.Make[*hexlua.Environment](app, "lua")
 //	env.PreloadModule("myapp", myModule.Loader)
 //	env.SetGlobal("build_version", "v1.2.3")
 //
-// This matches how hex/web exposes *web.Server for route registration
-// and how hex/config accepts Sources — the framework provides the
-// primitive; other providers layer on top.
+// As a foundational convenience, this provider also installs the
+// 'config' and 'log' Lua modules automatically — both are
+// always-available in a hex app, so binding them here avoids
+// forcing every scaffold to wire dedicated bridge providers for
+// them. Other services (db, cache, queue, events, ai, ...) are
+// optional; their own providers install their Lua modules when
+// they see a shared env in the container.
+//
+// Register order: hex/config/provider first (its "config" binding
+// is resolved here), then hex/log/provider, then this provider.
 //
 // Shutdown closes the environment.
 package provider
@@ -21,9 +28,13 @@ import (
 	"embed"
 	"io/fs"
 
-	hexlua "github.com/jordanbrauer/hex/lua"
+	glua "github.com/yuin/gopher-lua"
 
+	"github.com/jordanbrauer/hex/config"
+	configlua "github.com/jordanbrauer/hex/config/lua"
 	"github.com/jordanbrauer/hex/container"
+	loglua "github.com/jordanbrauer/hex/log/lua"
+	hexlua "github.com/jordanbrauer/hex/lua"
 	"github.com/jordanbrauer/hex/provider"
 )
 
@@ -58,7 +69,8 @@ type Provider struct {
 	env *hexlua.Environment
 }
 
-// Register builds the environment and binds it.
+// Register builds the environment, binds it into the container, and
+// preloads the foundational `config` and `log` Lua modules.
 func (p *Provider) Register(app provider.Application) error {
 	binding := p.Binding
 	if binding == "" {
@@ -71,7 +83,39 @@ func (p *Provider) Register(app provider.Application) error {
 		return p.env, nil
 	})
 
+	p.installConfigModule(app)
+	p.installLogModule()
+
 	return nil
+}
+
+// installConfigModule preloads the 'config' Lua module against the
+// shared env. The *config.Store must already be bound in the
+// container — the scaffolder registers hex/config/provider before
+// this one. Silent no-op when the binding is missing, so that a
+// test that only wants hex/lua without hex/config still works.
+func (p *Provider) installConfigModule(app provider.Application) {
+	store, err := container.Make[*config.Store](app, "config")
+	if err != nil || store == nil {
+		return
+	}
+
+	bindings := &configlua.Bindings{Store: store}
+
+	p.env.PreloadModule("config", func(L *glua.LState) int {
+		return bindings.Loader(L)
+	})
+}
+
+// installLogModule preloads the 'log' Lua module. hex/log delegates
+// to slog.Default at call time, so no container lookup is needed —
+// the module is stateless.
+func (p *Provider) installLogModule() {
+	bindings := &loglua.Bindings{}
+
+	p.env.PreloadModule("log", func(L *glua.LState) int {
+		return bindings.Loader(L)
+	})
 }
 
 // Shutdown closes the shared Lua environment.
