@@ -9,10 +9,10 @@ myapp repl — teal mode. Ctrl+D or "exit" to quit.
 note: framework modules (db, cache, config, log, env, events, queue)
       are typed globals. ...
 
-myapp(teal)> log.info("hi", { from = "repl" })
+myapp(tl)> log.info("hi", { from = "repl" })
 INFO hi from=repl
-myapp(teal)> local rows = db.query("SELECT id, name FROM users LIMIT 3")
-myapp(teal)> for _, u in ipairs(rows) do print(u.id, u.name) end
+myapp(tl)> local rows = db.query("SELECT id, name FROM users LIMIT 3")
+myapp(tl)> for _, u in ipairs(rows) do print(u.id, u.name) end
 ```
 
 ## Modes
@@ -58,13 +58,13 @@ lets you cross freely between them — including in ways that
 look like type violations:
 
 ```
-myapp(teal)> global foo: string = "1"
-myapp(teal)> l                            ← switch to lua
+myapp(tl)> global foo: string = "1"
+myapp(tl)> l                            ← switch to lua
 myapp(lua)>  foo = 20                     ← Lua doesn't check; _G.foo = 20
 myapp(lua)>  ⌫                            ← back to teal
-myapp(teal)> print(foo)
+myapp(tl)> print(foo)
 20                                        ← sees the mutated runtime value
-myapp(teal)> foo = 21
+myapp(tl)> foo = 21
 error: type error: in assignment: got integer, expected string
                                           ← Teal still thinks foo is a string
 ```
@@ -103,19 +103,19 @@ Teal uses standard Lua chunk semantics: **locals die at the end of
 their chunk**. Each REPL line is its own chunk.
 
 ```lua
-myapp(teal)> local rows = db.query("...")     -- ok
-myapp(teal)> print(#rows)                     -- ERROR: rows unknown
+myapp(tl)> local rows = db.query("...")     -- ok
+myapp(tl)> print(#rows)                     -- ERROR: rows unknown
 ```
 
 Two ways to persist:
 
 ```lua
 -- 1. Use globals (Teal requires explicit declaration):
-myapp(teal)> global rows = db.query("...")
-myapp(teal)> print(#rows)                     -- ok
+myapp(tl)> global rows = db.query("...")
+myapp(tl)> print(#rows)                     -- ok
 
 -- 2. Chain into one line:
-myapp(teal)> print(#db.query("..."))          -- ok
+myapp(tl)> print(#db.query("..."))          -- ok
 ```
 
 Framework modules are already pre-declared as globals, so
@@ -162,8 +162,8 @@ env.PreloadModule("users", func(L *glua.LState) int {
 Then in the REPL:
 
 ```
-myapp(teal)> local n, err = users.count()
-myapp(teal)> print("users:", n)
+myapp(tl)> local n, err = users.count()
+myapp(tl)> print("users:", n)
 ```
 
 `SetType` is optional but strongly recommended — without it, Teal
@@ -216,10 +216,10 @@ Tab completes the identifier at the cursor by inspecting the Lua
 state's globals table.
 
 ```
-myapp(teal)> pri<TAB>          → print
-myapp(teal)> db.q<TAB>          → db.query
-myapp(teal)> db.q<TAB><TAB>     → db.queryOne  (cycles)
-myapp(teal)> db.q<TAB><TAB><TAB> → db.query      (wraps)
+myapp(tl)> pri<TAB>          → print
+myapp(tl)> db.q<TAB>          → db.query
+myapp(tl)> db.q<TAB><TAB>     → db.queryOne  (cycles)
+myapp(tl)> db.q<TAB><TAB><TAB> → db.query      (wraps)
 ```
 
 - **Bare identifier prefix** — walks `_G`, offers all globals
@@ -243,14 +243,14 @@ chunk boundaries anyway).
 ## Multi-line input
 
 When you hit Enter on syntactically incomplete input, the REPL
-switches to a continuation prompt (`myapp(teal). `) and buffers
+switches to a continuation prompt (`myapp(tl). `) and buffers
 your next line onto the current one:
 
 ```
-myapp(teal)> function greet(name: string)
-myapp(teal).   log.info("hi " .. name)
-myapp(teal). end
-myapp(teal)> greet("world")
+myapp(tl)> function greet(name: string)
+myapp(tl).   log.info("hi " .. name)
+myapp(tl). end
+myapp(tl)> greet("world")
 INFO hi world
 ```
 
