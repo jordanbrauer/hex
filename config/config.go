@@ -91,16 +91,25 @@ type Config struct {
 
 	// EnvFile is an optional path to a .env file loaded before env-var
 	// bindings resolve. Missing files are ignored.
+	//
+	// When Environment is non-empty, Load also attempts to load
+	// `<EnvFile>.<Environment>` FIRST (so values there win over the
+	// base .env). Common pattern:
+	//
+	//	.env               local defaults (typically gitignored)
+	//	.env.test          committed; test overrides
+	//	.env.production    committed; production overrides
+	//
+	// OS env still wins over anything godotenv loads.
 	EnvFile string
 
-	// Environment, when non-empty, enables overlay files. For a base
-	// namespace file `<name>.toml`, any sibling `<name>.<Environment>.toml`
-	// is loaded and merged over the base. Overlays are picked up from
-	// every Source that contains them.
+	// Environment names the runtime environment. When non-empty, Load
+	// also loads `<EnvFile>.<Environment>` (see EnvFile above) to
+	// apply env-specific overrides.
 	//
-	// Set via the hex/config/provider integration or manually for
-	// tests. Empty Environment disables overlays (only <name>.toml
-	// files are loaded).
+	// Env-bound values (declared in EnvMap / env.yaml) participate in
+	// CUE schema validation at Load time, so bad env overrides fail
+	// loudly like bad TOML values would.
 	Environment string
 
 	// StrictValidation, when true, causes Load to return an error if any
@@ -125,6 +134,16 @@ type Store struct {
 // user dir, no .env) are not errors.
 func Load(cfg Config) (*Store, error) {
 	if cfg.EnvFile != "" {
+		// Load the env-specific overlay FIRST so its values populate
+		// os.Environ before the base .env fills gaps. godotenv does
+		// not overwrite values already set, so this yields the
+		// desired precedence: OS env > .env.<env> > .env.
+		if cfg.Environment != "" {
+			if err := loadEnvFile(cfg.EnvFile + "." + cfg.Environment); err != nil {
+				return nil, err
+			}
+		}
+
 		if err := loadEnvFile(cfg.EnvFile); err != nil {
 			return nil, err
 		}
@@ -166,61 +185,21 @@ func Load(cfg Config) (*Store, error) {
 			return nil, fmt.Errorf("config: read source[%d]: %w", srcIdx, err)
 		}
 
-		// First pass: base namespace files (<name>.toml, no env suffix).
-		// Overlays are collected in a second pass so a source with only
-		// an overlay file (no base) still layers correctly if a prior
-		// source contributed the base.
-		type scanned struct {
-			name     string
-			filename string
-			overlay  bool
-		}
-
-		var bases, overlays []scanned
-
 		for _, entry := range entries {
 			if entry.IsDir() || filepath.Ext(entry.Name()) != ".toml" {
 				continue
 			}
 
-			stem := strings.TrimSuffix(entry.Name(), ".toml")
-
-			if dot := strings.LastIndex(stem, "."); dot > 0 {
-				// <name>.<env>.toml — overlay. Only include when the
-				// suffix matches the active environment.
-				suffix := stem[dot+1:]
-				if cfg.Environment != "" && suffix == cfg.Environment {
-					overlays = append(overlays, scanned{
-						name:     stem[:dot],
-						filename: entry.Name(),
-						overlay:  true,
-					})
-				}
-
-				continue
+			name := strings.TrimSuffix(entry.Name(), ".toml")
+			if _, seen := namespaceFiles[name]; !seen {
+				discoveredNamespaces = append(discoveredNamespaces, name)
 			}
 
-			bases = append(bases, scanned{name: stem, filename: entry.Name()})
-		}
-
-		record := func(sc scanned) {
-			if _, seen := namespaceFiles[sc.name]; !seen {
-				discoveredNamespaces = append(discoveredNamespaces, sc.name)
-			}
-
-			namespaceFiles[sc.name] = append(namespaceFiles[sc.name], namespaceSource{
+			namespaceFiles[name] = append(namespaceFiles[name], namespaceSource{
 				source:   src,
 				dir:      sourcesDir,
-				filename: sc.filename,
+				filename: entry.Name(),
 			})
-		}
-
-		for _, b := range bases {
-			record(b)
-		}
-
-		for _, o := range overlays {
-			record(o)
 		}
 	}
 
