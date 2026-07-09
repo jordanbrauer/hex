@@ -15,7 +15,19 @@ build:
     COMMIT=$(git rev-parse HEAD 2>/dev/null || echo unknown)
     DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
     go build -ldflags "-X {{.ModulePath}}/app/build.version=$VERSION -X {{.ModulePath}}/app/build.commit=$COMMIT -X {{.ModulePath}}/app/build.date=$DATE" -o bin/{{.BinaryName}} .
+{{ if .HasFrontend }}
+# Build the frontend assets (CSS, {{ if .FrontendTS }}TypeScript, {{ end }}vendored libs).
+build-fe:
+{{- if .FrontendTS }}
+    pnpm exec mix --production
+{{- else }}
+    just sync-fe
+    pnpm exec tailwindcss -i ./resources/css/app.css -o ./public/css/app.css --minify
+{{- end }}
 
+# Build everything (Go binary + frontend assets).
+build-all: build-fe build
+{{ end -}}
 # Run tests.
 test:
     go test ./...
@@ -38,7 +50,51 @@ tidy:
 
 # Full pre-commit gate: vet + race tests.
 check: vet race
+{{ if .HasFrontend }}
+# Frontend recipes ---------------------------------------------------
 
+# Install pnpm dependencies + copy vendored libs into public/vendor.
+install-fe:
+    pnpm install
+{{- if not .FrontendTS }}
+    @just sync-fe
+{{- end }}
+
+# Watch + rebuild frontend assets on change (Ctrl+C to stop).
+dev-fe:
+{{- if .FrontendTS }}
+    pnpm exec mix watch
+{{- else }}
+    just sync-fe
+    pnpm exec tailwindcss -i ./resources/css/app.css -o ./public/css/app.css --watch
+{{- end }}
+
+# Copy vendored htmx + alpine from node_modules into public/vendor/.
+# In TS mode, laravel-mix handles this during build/watch, so this
+# recipe is only meaningful in JS mode.
+sync-fe:
+{{- if .FrontendTS }}
+    @echo "sync-fe is a no-op in TS mode; use \`just build-fe\` or \`just dev-fe\`"
+{{- else }}
+    pnpm exec cpy 'node_modules/htmx.org/dist/htmx.min.js' 'node_modules/alpinejs/dist/cdn.min.js' public/vendor/ --flat
+{{- end }}
+
+# Lint JS/TS/CSS with biome.
+lint-fe:
+    pnpm exec biome check .
+
+# Auto-fix formatting.
+format-fe:
+    pnpm exec biome format --write .
+
+# Run frontend tests with vitest.
+test-fe:
+    pnpm exec vitest run
+
+# Watch frontend tests.
+test-fe-watch:
+    pnpm exec vitest
+{{ end -}}
 # Run the app in dev mode.
 run:
     go run .
@@ -47,3 +103,6 @@ run:
 clean:
     rm -rf bin/
     go clean -testcache
+{{- if .HasFrontend }}
+    rm -rf public/css/app.css public/vendor/{{ if .FrontendTS }} public/js/app.js public/js/manifest.json{{ end }}
+{{- end }}
