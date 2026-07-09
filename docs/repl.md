@@ -28,7 +28,7 @@ myapp(tl)> for _, u in ipairs(rows) do print(u.id, u.name) end
   Lua. Balanced parens, macros, tail-call optimization, pattern
   matching. Compiles to Lua under the hood — all framework modules
   work the same way (`(local db (require :db))`).
-  Prompt color: `#63b132` (Clojure-ish green).
+  Prompt color: `#fef3d7` (Clojure-ish green).
 
 ### Switching modes at runtime (Julia-style)
 
