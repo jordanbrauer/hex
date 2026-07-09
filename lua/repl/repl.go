@@ -262,6 +262,25 @@ func runScripted(env *hexlua.Environment, session *teal.Session, isTeal bool, op
 // modes. Pressing Backspace at an empty prompt in a non-default
 // mode returns to the default.
 func runInteractive(env *hexlua.Environment, session *teal.Session, isTeal bool, appName, banner string) error {
+	// Detect the terminal's color capability once. Used by the
+	// evaluator closure to reapply the profile after every
+	// SetOutput swap — charm.Logger.SetOutput rebuilds its
+	// internal renderer from the new writer, which auto-detects
+	// TTY and falls back to Ascii for non-TTY writers like the
+	// strings.Builder we swap in. Reapplying SetColorProfile AFTER
+	// SetOutput is the only way to keep colors.
+	//
+	// The interactive REPL is TTY-gated at entry, so we KNOW the
+	// terminal supports color; if env detection reports Ascii
+	// anyway (common under cobra/tea wrapping), upgrade to
+	// ANSI256.
+	profile := termenv.NewOutput(os.Stdout).EnvColorProfile()
+	if profile == termenv.Ascii {
+		profile = termenv.ANSI256
+	}
+
+	lipgloss.SetColorProfile(profile)
+
 	// evaluator is a synchronous closure the TUI calls for each
 	// submitted line. Print output from Lua is redirected into the
 	// same buffer as expression-return values so Result.Output
@@ -288,6 +307,7 @@ func runInteractive(env *hexlua.Environment, session *teal.Session, isTeal bool,
 		defer env.SetStdout(origStdout)
 
 		hexlog.SetOutput(&outBuf)
+		hexlog.SetColorProfile(profile) // MUST come after SetOutput
 		defer hexlog.SetOutput(os.Stderr)
 
 		modeIsTeal := mode == "teal"
@@ -346,22 +366,6 @@ func runInteractive(env *hexlua.Environment, session *teal.Session, isTeal bool,
 	} else {
 		modes = []tuirepl.Mode{luaMode, tealMode}
 	}
-
-	// The interactive REPL is TTY-gated at entry (isatty on
-	// os.Stdin), so we KNOW the terminal supports color. Force a
-	// rich profile on both renderers so log output rendered
-	// through a strings.Builder still carries ANSI codes.
-	//
-	// Prefers the env-detected profile when it's better than
-	// Ascii; falls back to ANSI256 when detection reports Ascii
-	// (common inside pipes / non-tty go stdlib checks).
-	profile := termenv.NewOutput(os.Stdout).EnvColorProfile()
-	if profile == termenv.Ascii {
-		profile = termenv.ANSI256
-	}
-
-	lipgloss.SetColorProfile(profile)
-	hexlog.SetColorProfile(profile)
 
 	model := tuirepl.New(tuirepl.Options{
 		Banner:       banner,
