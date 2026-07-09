@@ -105,7 +105,7 @@ func TestIsIncompleteError_gopherLua(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.src == "" {
-				if isIncompleteError(nil, false) {
+				if isIncompleteError(nil, hexlua.Lua) {
 					t.Errorf("nil err reported incomplete")
 				}
 
@@ -121,7 +121,7 @@ func TestIsIncompleteError_gopherLua(t *testing.T) {
 				return
 			}
 
-			got := isIncompleteError(err, false)
+			got := isIncompleteError(err, hexlua.Lua)
 			if got != tc.incomplete {
 				t.Errorf("isIncompleteError(%q) = %v, want %v; err=%q", tc.src, got, tc.incomplete, err.Error())
 			}

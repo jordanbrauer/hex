@@ -42,6 +42,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/jordanbrauer/hex/lua/fennel"
 	"github.com/jordanbrauer/hex/lua/teal"
 
 	lua "github.com/yuin/gopher-lua"
@@ -67,9 +68,11 @@ type Environment struct {
 	// Tea render.
 	stdout io.Writer
 
-	closed   bool
-	tealOnce sync.Once
-	tealErr  error
+	closed     bool
+	tealOnce   sync.Once
+	tealErr    error
+	fennelOnce sync.Once
+	fennelErr  error
 }
 
 // Option configures a new Environment.
@@ -207,6 +210,50 @@ func (e *Environment) Close() error {
 // detail so consumers do not need to type-assert.
 func (e *Environment) PreloadModule(name string, loader lua.LGFunction) {
 	e.L.PreloadModule(name, loader)
+}
+
+// Language selects which compiler front-end LoadString /
+// CheckString / LoadFile route the source through.
+type Language int
+
+const (
+	// Lua is plain gopher-lua source. No compilation step.
+	Lua Language = iota
+
+	// Teal is the typed Lua dialect. Source goes through the
+	// embedded Teal compiler; type errors surface at load time.
+	Teal
+
+	// Fennel is the Lisp dialect that compiles to Lua. Source
+	// goes through the embedded Fennel compiler; only surface
+	// errors (unbalanced parens, etc.) surface at load time —
+	// Fennel has no static type-checker.
+	Fennel
+)
+
+// String returns the human-readable name of a Language.
+func (l Language) String() string {
+	switch l {
+	case Teal:
+		return "teal"
+	case Fennel:
+		return "fennel"
+	default:
+		return "lua"
+	}
+}
+
+// LanguageFor returns the Language implied by the given file
+// extension. Unknown extensions default to Lua.
+func LanguageFor(path string) Language {
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".tl":
+		return Teal
+	case ".fnl":
+		return Fennel
+	default:
+		return Lua
+	}
 }
 
 // SetType registers a Teal .d.tl source describing the shape of a
@@ -368,12 +415,12 @@ func (e *Environment) ExecFile(path string) error {
 }
 
 // LoadFile reads path and compiles it to a Script, auto-detecting
-// Lua vs Teal by extension. Same semantics as CompileFile for .lua;
-// .tl files first run through the Teal compiler.
+// the language via file extension: .tl → Teal, .fnl → Fennel,
+// anything else → Lua.
 func (e *Environment) LoadFile(path string) (*Script, error) {
-	isTL := filepath.Ext(path) == ".tl"
+	lang := LanguageFor(path)
 
-	if !isTL {
+	if lang == Lua {
 		return CompileFile(path)
 	}
 
@@ -387,27 +434,42 @@ func (e *Environment) LoadFile(path string) (*Script, error) {
 		abs = path
 	}
 
-	return e.LoadString(string(data), abs, true)
+	return e.LoadString(string(data), abs, lang)
 }
 
-// LoadString compiles a source string to a Script, treating it as
-// Teal when isTeal is true (routed through the embedded Teal
-// compiler) or Lua otherwise.
-func (e *Environment) LoadString(source, name string, isTeal bool) (*Script, error) {
-	if !isTeal {
+// LoadString compiles source (named for error messages) as the
+// specified Language and returns a runnable Script. Teal and Fennel
+// route through their respective embedded compilers first; the
+// resulting Lua is parsed by gopher-lua.
+func (e *Environment) LoadString(source, name string, lang Language) (*Script, error) {
+	switch lang {
+	case Teal:
+		if err := e.ensureTeal(); err != nil {
+			return nil, err
+		}
+
+		luaSrc, err := teal.Compile(e.L, source, name)
+		if err != nil {
+			return nil, fmt.Errorf("lua: compile teal %s: %w", name, err)
+		}
+
+		return Compile(luaSrc, name)
+
+	case Fennel:
+		if err := e.ensureFennel(); err != nil {
+			return nil, err
+		}
+
+		luaSrc, err := fennel.Compile(e.L, source, name)
+		if err != nil {
+			return nil, fmt.Errorf("lua: compile fennel %s: %w", name, err)
+		}
+
+		return Compile(luaSrc, name)
+
+	default:
 		return Compile(source, name)
 	}
-
-	if err := e.ensureTeal(); err != nil {
-		return nil, err
-	}
-
-	luaSrc, err := teal.Compile(e.L, source, name)
-	if err != nil {
-		return nil, fmt.Errorf("lua: compile teal %s: %w", name, err)
-	}
-
-	return Compile(luaSrc, name)
 }
 
 // ensureTeal lazy-loads the Teal compiler into this Environment's
@@ -421,16 +483,25 @@ func (e *Environment) ensureTeal() error {
 	return e.tealErr
 }
 
-// CheckFile runs a Lua or Teal file through validation without
-// executing it. For .lua files this parses only. For .tl files this
-// runs the Teal type-checker.
+// ensureFennel lazy-loads the Fennel compiler. Mirror of ensureTeal.
+func (e *Environment) ensureFennel() error {
+	e.fennelOnce.Do(func() {
+		e.fennelErr = fennel.Load(e.L)
+	})
+
+	return e.fennelErr
+}
+
+// CheckFile runs a file through validation without executing it.
+// .lua parses only. .tl runs the Teal type-checker. .fnl runs
+// the Fennel compiler as a syntax check.
 //
-// Intended for CI (fail the build on Teal type errors) and for
+// Intended for CI (fail the build on typecheck errors) and for
 // pre-flight validation of user-supplied scripts.
 func (e *Environment) CheckFile(path string) error {
-	isTL := filepath.Ext(path) == ".tl"
+	lang := LanguageFor(path)
 
-	if !isTL {
+	if lang == Lua {
 		_, err := CompileFile(path)
 
 		return err
@@ -446,24 +517,35 @@ func (e *Environment) CheckFile(path string) error {
 		abs = path
 	}
 
-	return e.CheckString(string(data), abs, true)
+	return e.CheckString(string(data), abs, lang)
 }
 
-// CheckString validates source without executing it. When isTeal is
-// true the source runs through the Teal typechecker; otherwise it
-// runs through Lua's parser.
-func (e *Environment) CheckString(source, name string, isTeal bool) error {
-	if !isTeal {
+// CheckString validates source without executing it. Teal runs the
+// full typechecker. Fennel and Lua run through their parsers (Fennel
+// has no static type layer).
+func (e *Environment) CheckString(source, name string, lang Language) error {
+	switch lang {
+	case Teal:
+		if err := e.ensureTeal(); err != nil {
+			return err
+		}
+
+		return teal.Check(e.L, source, name)
+
+	case Fennel:
+		if err := e.ensureFennel(); err != nil {
+			return err
+		}
+
+		_, err := fennel.Compile(e.L, source, name)
+
+		return err
+
+	default:
 		_, err := Compile(source, name)
 
 		return err
 	}
-
-	if err := e.ensureTeal(); err != nil {
-		return err
-	}
-
-	return teal.Check(e.L, source, name)
 }
 
 // -- helpers ---------------------------------------------------------------

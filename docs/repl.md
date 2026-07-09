@@ -24,6 +24,11 @@ myapp(teal)> for _, u in ipairs(rows) do print(u.id, u.name) end
   semantics; implicit globals allowed; no typecheck. Use this when
   Teal's strictness gets in the way for a quick prototype.
   Prompt color: `#000080` (Lua's classic navy).
+- **Fennel** (`--mode fennel` / `mode = "fennel"`): Lisp-flavoured
+  Lua. Balanced parens, macros, tail-call optimization, pattern
+  matching. Compiles to Lua under the hood — all framework modules
+  work the same way (`(local db (require :db))`).
+  Prompt color: `#63b132` (Clojure-ish green).
 
 ### Switching modes at runtime (Julia-style)
 
@@ -34,6 +39,7 @@ quitting the REPL:
 |-------------|-------------------------------------------------|
 | `t`         | switch to Teal mode                             |
 | `l`         | switch to Lua mode                              |
+| `f`         | switch to Fennel mode                           |
 | Backspace   | return to the mode you launched with (default)  |
 
 The activator only fires when the input line is empty — typing `l`
