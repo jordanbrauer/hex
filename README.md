@@ -8,15 +8,13 @@
 
 **An opinionated Go application framework.**
 
-hex gives you the boring, load-bearing pieces every real Go service ends
-up needing — an IoC container, service providers with a proper lifecycle,
-a typed event bus, layered config, structured logging, an HTTP server, a
+hex is an IoC container, service providers with a proper lifecycle, a
+typed event bus, layered config, structured logging, an HTTP server, a
 view engine, an embedded Lua runtime, a queue, a scheduler, a policy
-engine, feature flags, i18n, telemetry — all behind coherent interfaces
-that compose. It ships with a scaffolding CLI that generates full
-projects and individual pieces (providers, controllers, migrations,
-commands) following the same conventions the framework enforces at
-runtime.
+engine, feature flags, i18n, and telemetry — behind coherent interfaces
+that compose. A scaffolding CLI generates full projects and individual
+pieces (providers, controllers, migrations, commands) following the same
+conventions the framework enforces at runtime.
 
 Write your business logic. Let hex handle the rest.
 
@@ -184,8 +182,7 @@ hex stands on the shoulders of many prior frameworks and libraries.
 Direct influences:
 
 - **[Laravel](https://laravel.com)** — the service container, service
-  provider lifecycle, artisan-style scaffolder, and general "batteries
-  included with taste" philosophy.
+  provider lifecycle, and artisan-style scaffolder.
 - **[Phoenix](https://phoenixframework.org)** — the runtime environment
   as a first-class concept, the layered supervisor tree feel of the
   provider registry, and channel-flavoured event bus semantics.
