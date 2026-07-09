@@ -54,7 +54,7 @@ on its own line:
 ## Verify your changes
 
 ```
-just check        # fmt-check + lint + vet + race tests
+just check        # fmt-check{{ if .Lint }} + lint{{ end }} + vet + race tests
 {{- if .Web}}
 go run . serve    # boot the app and exercise it
 {{- end}}

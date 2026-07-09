@@ -1,0 +1,71 @@
+# GoReleaser config for {{.Name}}.
+#
+# Builds the `{{.BinaryName}}` binary for linux + darwin, amd64 + arm64,
+# and packages each as a .tar.gz archive uploaded to the GitHub Release.
+#
+# Try it locally without publishing:
+#
+#	goreleaser release --snapshot --clean
+
+version: 2
+project_name: {{.Name}}
+dist: ./dist
+
+builds:
+  - id: {{.BinaryName}}
+    main: .
+    binary: {{.BinaryName}}
+    mod_timestamp: "{{ "{{" }} .CommitTimestamp {{ "}}" }}"
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    flags:
+      - -trimpath
+    ldflags:
+      - >-
+        -s -w
+        -X {{.ModulePath}}/app/build.branch={{ "{{" }}.Branch{{ "}}" }}
+        -X {{.ModulePath}}/app/build.commit={{ "{{" }}.Commit{{ "}}" }}
+        -X {{.ModulePath}}/app/build.date={{ "{{" }}.Date{{ "}}" }}
+        -X {{.ModulePath}}/app/build.version={{ "{{" }}.Version{{ "}}" }}
+    env:
+      - CGO_ENABLED=0
+    hooks:
+      pre: go mod tidy
+
+archives:
+  - id: {{.BinaryName}}
+    formats:
+      - tar.gz
+    name_template: >-
+      {{ "{{" }} .ProjectName {{ "}}" }}_
+      {{ "{{" }}- .Version {{ "}}" }}_
+      {{ "{{" }}- .Os {{ "}}" }}_
+      {{ "{{" }}- if eq .Arch "amd64" {{ "}}" }}x86_64
+      {{ "{{" }}- else {{ "}}" }}{{ "{{" }} .Arch {{ "}}" }}{{ "{{" }} end {{ "}}" }}
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  use: github
+  sort: asc
+  groups:
+    - title: Features
+      regexp: '^.*?(feat|feature)[(\\w)]*:?\\s+.*$'
+      order: 0
+    - title: Bug fixes
+      regexp: '^.*?(fix|bug)[(\\w)]*:?\\s+.*$'
+      order: 1
+    - title: Other
+      order: 999
+
+release:
+  github:
+    owner: {{.GitHubOwner}}
+    name: {{.GitHubRepo}}
+  draft: false
+  prerelease: auto

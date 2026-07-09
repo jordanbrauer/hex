@@ -7,6 +7,10 @@ coverage.*
 .DS_Store
 .env
 .env.local
+{{ if .Goreleaser }}
+# GoReleaser build output
+/dist/
+{{ end -}}
 {{ if .HasFrontend }}
 # Node
 node_modules/

@@ -1,0 +1,47 @@
+# {{.Name}} uses a deliberately lenient linter set — enough to catch
+# real bugs without blocking on style. Ratchet up strictness as the
+# project matures; see hex's own .golangci.yml for the same baseline.
+#
+# golangci-lint v2 config format.
+
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  default: none
+  enable:
+    - govet          # official — suspicious constructs
+    - staticcheck    # SA rules — real bugs + performance
+    - ineffassign    # unused assignments
+
+  exclusions:
+    rules:
+      # Tests routinely declare `var _ SomeInterface = concreteExpr`
+      # to prove type-alias / interface-satisfaction. The explicit
+      # type is the assertion; QF1011 misfires here.
+      - path: _test\.go
+        text: "QF1011"
+
+  settings:
+    govet:
+      enable-all: true
+      disable:
+        # fieldalignment is noisy and rarely worth its churn.
+        - fieldalignment
+        # shadow is opinionated about a legitimate Go pattern.
+        - shadow
+
+    staticcheck:
+      checks:
+        - all
+        # SA1019: don't warn on deprecated APIs from wrapped libraries.
+        - "-SA1019"
+        # QF1001 (De Morgan's law) is a style suggestion, not a bug.
+        - "-QF1001"
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

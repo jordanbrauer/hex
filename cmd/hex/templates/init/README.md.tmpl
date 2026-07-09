@@ -116,3 +116,15 @@ hex make:adapter cache/redis      # infrastructure/cache/redis/redis.go stub
 just build          # produces bin/{{.BinaryName}} with ldflags-populated version info
 just                # list all recipes
 ```
+{{ if or .Lint .Goreleaser }}
+## Developer tooling
+{{ if .Lint }}
+- `.golangci.yml` — lint config; run with `just lint` (install [golangci-lint](https://golangci-lint.run/welcome/install/) once).
+{{- end }}
+{{- if .Goreleaser }}
+- `.goreleaser.yaml` — release config; dry-run a snapshot build with `just release-dry-run` (install [goreleaser](https://goreleaser.com/install/) once).
+{{- if .HasGithubActions }}
+  Tag pushes matching `v*` trigger `.github/workflows/release.yml`, which runs goreleaser in CI.
+{{- end }}
+{{- end }}
+{{ end -}}
