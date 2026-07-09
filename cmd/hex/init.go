@@ -552,6 +552,7 @@ func coreFiles(cfg initConfig) []fileSpec {
 		{"templates/init/env.dist.tmpl", filepath.Join(cfg.Directory, ".env.dist")},
 		{"templates/init/README.md.tmpl", filepath.Join(cfg.Directory, "README.md")},
 		{"templates/init/go.mod.tmpl", filepath.Join(cfg.Directory, "go.mod")},
+		{"templates/init/air.toml.tmpl", filepath.Join(cfg.Directory, ".air.toml")},
 	}
 }
 
