@@ -60,6 +60,12 @@ The generated project is runnable immediately: it wires an app kernel, a
 provider registry, config, logging, and an embedded Lua REPL, and drops the
 `// hex:*` marker comments that `hex make:*` uses to auto-wire new code.
 
+Developer tooling — `.editorconfig`, a `.golangci.yml` lint config, and a
+`.goreleaser.yaml` release config — is scaffolded by default. Opt out with
+`--editorconfig=false`, `--lint=false`, or `--goreleaser=false`. Pass `--github`
+to also scaffold a `.github/workflows/release.yml` that runs goreleaser on
+tag push (implies `--goreleaser`).
+
 Usage:
 
 ```
@@ -83,6 +89,9 @@ Options:
 `--dry-run`
 :   print the actions without writing any files
 
+`--editorconfig`
+:   scaffold an .editorconfig (default "true")
+
 `--featureflag`
 :   scaffold a featureflag (GOFF) provider
 
@@ -95,8 +104,17 @@ Options:
 `--frontend` *string*
 :   frontend stack: js (no build), ts (Laravel Mix), none (default) (default "none")
 
+`--github`
+:   scaffold a GitHub Actions release workflow (implies --goreleaser)
+
+`--goreleaser`
+:   scaffold a .goreleaser.yaml release config (default "true")
+
 `--i18n`
 :   scaffold an i18n (gotext) provider
+
+`--lint`
+:   scaffold a .golangci.yml lint config (default "true")
 
 `--module` *string*
 :   Go module path (default: github.com/<user>/<name>)
@@ -131,6 +149,10 @@ hex init . --yes
 # A batteries-on service: queue, cron, policy, i18n, flags, telemetry, AI
 hex init myapp --web --queue memory --cron --policy --i18n \
   --featureflag --telemetry stdout --ai anthropic --yes
+
+# Skip lint/goreleaser scaffolding; add a GitHub Actions release workflow
+hex init myapp --lint=false --goreleaser=false --yes
+hex init myapp --github --yes
 ```
 
 ## hex make:adapter

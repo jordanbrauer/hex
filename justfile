@@ -34,8 +34,8 @@ cover:
 vet:
     go vet ./...
 
-# Run golangci-lint.
-lint:
+# Run golangci-lint, plus the format + generated-docs checks CI also gates on.
+lint: fmt-check man-check
     golangci-lint run ./...
 
 # Format all Go source in place.
@@ -47,6 +47,18 @@ fmt-check:
     @diff=$(gofmt -s -l .); \
     if [ -n "$diff" ]; then \
         echo "unformatted files:"; echo "$diff"; exit 1; \
+    fi
+
+# Verify generated manpage markdown (docs/man/hex.{1,3}.md) matches the command tree.
+man-check:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    go run ./cmd/hex gen-man
+    if ! git diff --quiet -- docs/man; then
+        echo "Generated manpage markdown is stale."
+        echo "Run 'just man' (or 'go run ./cmd/hex gen-man') and commit docs/man/*.md."
+        git diff -- docs/man
+        exit 1
     fi
 
 # Tidy the module graph.
@@ -65,8 +77,8 @@ man:
         echo "→ man/$base"; \
     done
 
-# Full pre-commit gate: format check, lint, vet, race tests.
-check: fmt-check lint vet race
+# Full pre-commit gate: lint (fmt-check + man-check + golangci-lint), vet, race tests.
+check: lint vet race
 
 # Remove build/test artifacts.
 clean:
