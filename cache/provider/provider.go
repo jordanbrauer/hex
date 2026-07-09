@@ -10,10 +10,14 @@ import (
 	"fmt"
 	"io/fs"
 
+	glua "github.com/yuin/gopher-lua"
+
 	"github.com/jordanbrauer/hex/cache"
+	cachelua "github.com/jordanbrauer/hex/cache/lua"
 	"github.com/jordanbrauer/hex/cache/memory"
 	"github.com/jordanbrauer/hex/config"
 	"github.com/jordanbrauer/hex/container"
+	hexlua "github.com/jordanbrauer/hex/lua"
 	"github.com/jordanbrauer/hex/provider"
 )
 
@@ -72,7 +76,25 @@ func (p *Provider) Register(app provider.Application) error {
 		return p.cache, nil
 	})
 
+	p.installLuaModule(app)
+
 	return nil
+}
+
+// installLuaModule preloads the 'cache' Lua module against the
+// shared *hex/lua.Environment when one is bound. Silent no-op
+// otherwise — hex/cache is usable without Lua.
+func (p *Provider) installLuaModule(app provider.Application) {
+	env, err := container.Make[*hexlua.Environment](app, "lua")
+	if err != nil || env == nil {
+		return
+	}
+
+	bindings := &cachelua.Bindings{Cache: p.cache}
+
+	env.PreloadModule("cache", func(L *glua.LState) int {
+		return bindings.Loader(L)
+	})
 }
 
 // buildBackend consults the resolved store to pick a backend. v1
