@@ -111,8 +111,7 @@ func (r *Runner) Register(name string, handler Handler) {
 	r.handlers.Store(name, handler)
 }
 
-// Dispatch serialises payload and publishes a job with the given name to
-// the runner's topic. opts customise this single dispatch.
+// DispatchOptions customises a single Runner.Dispatch call.
 type DispatchOptions struct {
 	// Delay defers execution for at least this duration.
 	Delay time.Duration

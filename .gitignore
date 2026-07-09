@@ -1,5 +1,24 @@
+# Build / test artefacts
 *.test
 *.out
 coverage.out
 coverage.html
+/hex
+/dist/
+
+# Environment
+.env
+.env.local
+!.env.dist
+
+# Editor / OS
 .DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Tooling caches
+/tmp/
+.golangci-lint-cache/

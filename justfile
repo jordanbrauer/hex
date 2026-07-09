@@ -34,6 +34,10 @@ cover:
 vet:
     go vet ./...
 
+# Run golangci-lint.
+lint:
+    golangci-lint run ./...
+
 # Format all Go source in place.
 fmt:
     gofmt -s -w .
@@ -49,8 +53,8 @@ fmt-check:
 tidy:
     go mod tidy
 
-# Full pre-commit gate: format check, vet, race tests.
-check: fmt-check vet race
+# Full pre-commit gate: format check, lint, vet, race tests.
+check: fmt-check lint vet race
 
 # Remove build/test artifacts.
 clean:

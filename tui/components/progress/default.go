@@ -1,3 +1,6 @@
+// Package progress renders a Bubble Tea progress bar model — a
+// composable spinner + percentage + label component reused across
+// hex CLIs and TUIs.
 package progress
 
 import (

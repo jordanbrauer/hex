@@ -1,3 +1,8 @@
+// Package renderer writes structured Go values to a writer in the
+// caller's chosen format (table, plain, json, yaml, toml, csv).
+// Values may implement Tabular or Templated for custom rendering;
+// otherwise the renderer falls back to fmt.Stringer or standard
+// encoders.
 package renderer
 
 import (

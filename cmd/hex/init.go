@@ -403,10 +403,6 @@ func (c initConfig) validate() error {
 		return fmt.Errorf("unknown --db value %q (want sqlite, postgres, or none)", c.Dialect)
 	}
 
-	if c.Dialect == "" {
-		c.Dialect = "sqlite"
-	}
-
 	switch c.Queue {
 	case "", "none", "memory":
 	default:
