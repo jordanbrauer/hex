@@ -17,7 +17,17 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/jordanbrauer/hex/build"
+	"github.com/jordanbrauer/hex/lua/plugin"
 )
+
+// commandPluginDir is where hex looks for repo-local command plugins
+// (Lua/Teal/Fennel), relative to the current working directory. A
+// missing directory is not an error — see plugin.LoadInto.
+const commandPluginDir = ".hex/command"
+
+// commandPluginGroup groups repo-local plugin commands under their
+// own heading in `hex --help`, separate from hex's built-in commands.
+var commandPluginGroup = plugin.Group{ID: "plugins", Title: "Plugins:"}
 
 func main() {
 	root := newRoot()
@@ -55,7 +65,21 @@ func newRoot() *cobra.Command {
 		newGenManCommand(),
 	)
 
+	loadCommandPlugins(cmd)
+
 	return cmd
+}
+
+// loadCommandPlugins mounts repo-local plugins found under
+// commandPluginDir (".hex/command", relative to cwd) onto cmd. A
+// missing directory is a silent no-op. A malformed plugin only warns
+// — it must not prevent the rest of hex's commands from working.
+func loadCommandPlugins(cmd *cobra.Command) {
+	exec := plugin.NewRuntimeExecutor()
+
+	if err := plugin.LoadInto(cmd, commandPluginGroup, []string{commandPluginDir}, exec); err != nil {
+		fmt.Fprintln(os.Stderr, "warning: loading", commandPluginDir, "plugins:", err)
+	}
 }
 
 func hexVersion() string {
