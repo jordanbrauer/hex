@@ -3,7 +3,7 @@ module github.com/jordanbrauer/hex
 go 1.26.5
 
 require (
-	charm.land/fantasy v0.35.2
+	charm.land/fantasy v0.36.0
 	cuelang.org/go v0.17.0
 	github.com/Joker/jade v1.1.3
 	github.com/Oudwins/zog v0.22.2
@@ -25,14 +25,15 @@ require (
 	github.com/labstack/echo/v4 v4.15.4
 	github.com/leonelquinteros/gotext v1.7.2
 	github.com/mattn/go-isatty v0.0.22
-	github.com/mattn/go-runewidth v0.0.20
+	github.com/mattn/go-runewidth v0.0.24
 	github.com/muesli/termenv v0.16.0
 	github.com/oklog/ulid/v2 v2.1.1
-	github.com/onsi/gomega v1.15.0
-	github.com/pelletier/go-toml/v2 v2.3.1
+	github.com/onsi/gomega v1.42.1
+	github.com/pelletier/go-toml/v2 v2.4.3
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/segmentio/ksuid v1.0.4
 	github.com/spf13/cobra v1.10.2
+	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.21.0
 	github.com/thomaspoignant/go-feature-flag v1.55.0
 	github.com/thomaspoignant/go-feature-flag/modules/core v0.7.2
@@ -140,7 +141,6 @@ require (
 	github.com/sourcegraph/conc v0.3.1-0.20240121214520-5f936abd7ae8 // indirect
 	github.com/spf13/afero v1.15.0 // indirect
 	github.com/spf13/cast v1.10.0 // indirect
-	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/tidwall/gjson v1.18.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
