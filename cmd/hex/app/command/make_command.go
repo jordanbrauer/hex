@@ -1,12 +1,16 @@
-package main
+package command
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
+
+	"github.com/jordanbrauer/hex"
+	"github.com/jordanbrauer/hex/cmd/hex/domain/generator"
 )
 
 // commandData feeds the command templates.
@@ -27,7 +31,7 @@ type commandData struct {
 	GroupPackage string
 }
 
-func newMakeCommandCommand() *cobra.Command {
+func newMakeCommandCommand(app *hex.App) *cobra.Command {
 	var (
 		group string
 		flags genFlags
@@ -50,28 +54,39 @@ func newMakeCommandCommand() *cobra.Command {
 			}
 
 			data := commandData{
-				Name:       goPackageName(name),
-				FuncName:   pascalCase(name),
-				Group:      goPackageName(group),
-				GroupFunc:  pascalCase(group),
+				Name:       generator.GoPackageName(name),
+				FuncName:   generator.PascalCase(name),
+				Group:      generator.GoPackageName(group),
+				GroupFunc:  generator.PascalCase(group),
 				ModulePath: modulePath,
 			}
 			data.GroupPackage = data.Group
 
-			g, err := newGeneratorFromFlags(flags)
+			opts, err := flags.options()
 			if err != nil {
 				return err
 			}
 
-			if data.Group == "" {
-				if err := makeTopLevelCommand(g, root, data); err != nil {
-					return err
-				}
-			} else if err := makeGroupCommand(g, root, data); err != nil {
+			svc, err := resolveGenerator(app)
+			if err != nil {
 				return err
 			}
 
-			return g.report()
+			ctx := cmd.Context()
+
+			var actions []generator.Action
+
+			if data.Group == "" {
+				actions, err = svc.Run(ctx, "command", root, data, opts)
+			} else {
+				actions, err = makeGroupCommand(ctx, svc, root, data, opts)
+			}
+
+			if err != nil {
+				return err
+			}
+
+			return report(cmd.OutOrStdout(), actions, opts, flags.format)
 		},
 	}
 
@@ -82,32 +97,19 @@ func newMakeCommandCommand() *cobra.Command {
 	return cmd
 }
 
-// makeTopLevelCommand generates app/command/<name>.go and wires it into
-// app/command/root.go via the hex:commands marker.
-func makeTopLevelCommand(g *generator, root string, data commandData) error {
-	target := filepath.Join(root, "app", "command", data.Name+".go")
-	if err := g.render("templates/command.go.tmpl", target, data); err != nil {
-		return err
-	}
-
-	// Register in the top-level root.go via the hex:commands marker.
-	rootFile := filepath.Join(root, "app", "command", "root.go")
-	registration := fmt.Sprintf("%s(app),", data.FuncName)
-
-	if err := g.wireMarker(rootFile, "// hex:commands", registration, "added "+data.FuncName); err != nil {
-		return fmt.Errorf("wire into %s: %w", rootFile, err)
-	}
-
-	return nil
-}
-
 // makeGroupCommand generates the group root (if missing) and the
-// subcommand, then wires everything up.
-func makeGroupCommand(g *generator, root string, data commandData) error {
+// subcommand, then wires everything up. This is conditional,
+// multi-target wiring — not a static Blueprint — so it calls Service's
+// primitive methods directly instead of Service.Run.
+func makeGroupCommand(ctx context.Context, svc *generator.Service, root string, data commandData, opts generator.Options) ([]generator.Action, error) {
+	var actions []generator.Action
+
 	groupDir := filepath.Join(root, "app", "command", data.Group)
 
-	if err := g.mkdirp(groupDir); err != nil {
-		return err
+	if act, err := svc.Mkdirp(groupDir, opts); err != nil {
+		return actions, err
+	} else if act != nil {
+		actions = append(actions, *act)
 	}
 
 	// Generate the group's root.go if not present. force does NOT apply
@@ -116,36 +118,58 @@ func makeGroupCommand(g *generator, root string, data commandData) error {
 	groupRoot := filepath.Join(groupDir, "root.go")
 
 	if _, err := os.Stat(groupRoot); errors.Is(err, os.ErrNotExist) {
-		if err := g.render("templates/command_group.go.tmpl", groupRoot, data); err != nil {
-			return err
+		act, err := svc.RenderFile(ctx, "templates/command_group.go.tmpl", groupRoot, data, opts)
+		if err != nil {
+			return actions, err
 		}
+
+		actions = append(actions, act)
 
 		// New group: register the group's root in the top-level root.go.
 		topRoot := filepath.Join(root, "app", "command", "root.go")
 		reg := fmt.Sprintf("%s.Root(app),", data.Group)
 
-		if err := g.wireMarker(topRoot, "// hex:commands", reg, "added "+data.Group+".Root"); err != nil {
-			return fmt.Errorf("wire group into %s: %w", topRoot, err)
+		wireAct, err := svc.WireMarker(topRoot, "// hex:commands", reg, "added "+data.Group+".Root", opts)
+		if err != nil {
+			return actions, fmt.Errorf("wire group into %s: %w", topRoot, err)
+		}
+
+		if wireAct != nil {
+			actions = append(actions, *wireAct)
 		}
 
 		// Add the group's package import to root.go.
-		if err := g.wireImport(topRoot, data.ModulePath+"/app/command/"+data.Group); err != nil {
-			return fmt.Errorf("add import to %s: %w", topRoot, err)
+		importAct, err := svc.WireImport(topRoot, data.ModulePath+"/app/command/"+data.Group, opts)
+		if err != nil {
+			return actions, fmt.Errorf("add import to %s: %w", topRoot, err)
+		}
+
+		if importAct != nil {
+			actions = append(actions, *importAct)
 		}
 	}
 
 	// Now the subcommand itself.
 	target := filepath.Join(groupDir, data.Name+".go")
-	if err := g.render("templates/command_sub.go.tmpl", target, data); err != nil {
-		return err
+
+	act, err := svc.RenderFile(ctx, "templates/command_sub.go.tmpl", target, data, opts)
+	if err != nil {
+		return actions, err
 	}
+
+	actions = append(actions, act)
 
 	// Register the subcommand in the group's root.go.
 	registration := fmt.Sprintf("%s(app),", data.FuncName)
 
-	if err := g.wireMarker(groupRoot, "// hex:commands:"+data.Group, registration, "added "+data.FuncName); err != nil {
-		return fmt.Errorf("wire into %s: %w", groupRoot, err)
+	wireAct, err := svc.WireMarker(groupRoot, "// hex:commands:"+data.Group, registration, "added "+data.FuncName, opts)
+	if err != nil {
+		return actions, fmt.Errorf("wire into %s: %w", groupRoot, err)
 	}
 
-	return nil
+	if wireAct != nil {
+		actions = append(actions, *wireAct)
+	}
+
+	return actions, nil
 }

@@ -1,9 +1,11 @@
-package main
+package command
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/jordanbrauer/hex"
 )
 
 // chdir switches the process into dir for the duration of the test,
@@ -25,7 +27,7 @@ func chdir(t *testing.T, dir string) {
 	}
 }
 
-func TestNewRoot_loadsCommandPlugins(t *testing.T) {
+func TestRoot_loadsCommandPlugins(t *testing.T) {
 	dir := t.TempDir()
 	pluginDir := filepath.Join(dir, ".hex", "command", "hello")
 
@@ -56,7 +58,7 @@ disk.write(cmd.flags().get_string("out"), "hello from plugin")
 
 	out := filepath.Join(dir, "out.txt")
 
-	root := newRoot()
+	root := Root(hex.New())
 	root.SetArgs([]string{"hello", "--out", out})
 
 	if err := root.Execute(); err != nil {
@@ -73,10 +75,10 @@ disk.write(cmd.flags().get_string("out"), "hello from plugin")
 	}
 }
 
-func TestNewRoot_noHexDirIsNoop(t *testing.T) {
+func TestRoot_noHexDirIsNoop(t *testing.T) {
 	chdir(t, t.TempDir())
 
-	root := newRoot()
+	root := Root(hex.New())
 
 	for _, g := range root.Groups() {
 		if g.ID == commandPluginGroup.ID {

@@ -1,21 +1,22 @@
-package main
+package command
 
 import (
 	"errors"
-	"fmt"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
+
+	"github.com/jordanbrauer/hex"
+	"github.com/jordanbrauer/hex/cmd/hex/domain/generator"
 )
 
-// providerData feeds the provider template.
+// providerData feeds the provider blueprint.
 type providerData struct {
 	Name       string // pascalCase (Payments)
-	Package    string // domain/module name for imports; unused here
+	Package    string // snake_case file/import name (payments)
 	ModulePath string
 }
 
-func newMakeProviderCommand() *cobra.Command {
+func newMakeProviderCommand(app *hex.App) *cobra.Command {
 	var flags genFlags
 
 	cmd := &cobra.Command{
@@ -35,30 +36,27 @@ func newMakeProviderCommand() *cobra.Command {
 			}
 
 			data := providerData{
-				Name:       pascalCase(name),
+				Name:       generator.PascalCase(name),
+				Package:    generator.SnakeCase(name),
 				ModulePath: modulePath,
 			}
 
-			target := filepath.Join(root, "app", "provider", snakeCase(name)+".go")
-
-			g, err := newGeneratorFromFlags(flags)
+			opts, err := flags.options()
 			if err != nil {
 				return err
 			}
 
-			if err := g.render("templates/provider.go.tmpl", target, data); err != nil {
+			svc, err := resolveGenerator(app)
+			if err != nil {
 				return err
 			}
 
-			// Wire into app/boot.go.
-			bootFile := filepath.Join(root, "app", "boot.go")
-			registration := fmt.Sprintf("&provider.%s{},", data.Name)
-
-			if err := g.wireMarker(bootFile, "// hex:providers", registration, "added "+data.Name); err != nil {
-				return fmt.Errorf("wire into boot.go: %w", err)
+			actions, err := svc.Run(cmd.Context(), "provider", root, data, opts)
+			if err != nil {
+				return err
 			}
 
-			return g.report()
+			return report(cmd.OutOrStdout(), actions, opts, flags.format)
 		},
 	}
 

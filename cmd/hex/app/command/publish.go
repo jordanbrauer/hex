@@ -1,4 +1,4 @@
-package main
+package command
 
 import (
 	"errors"
@@ -15,6 +15,9 @@ import (
 	logprovider "github.com/jordanbrauer/hex/log/provider"
 	telemetryprovider "github.com/jordanbrauer/hex/telemetry/provider"
 	webprovider "github.com/jordanbrauer/hex/web/provider"
+
+	"github.com/jordanbrauer/hex"
+	"github.com/jordanbrauer/hex/cmd/hex/domain/generator"
 )
 
 // publishables enumerates every framework provider that ships
@@ -28,7 +31,7 @@ var publishables = map[string]fs.FS{
 	"telemetry": telemetryprovider.Configs(),
 }
 
-func newPublishCommand() *cobra.Command {
+func newPublishCommand(app *hex.App) *cobra.Command {
 	var (
 		flags genFlags
 		all   bool
@@ -57,10 +60,17 @@ func newPublishCommand() *cobra.Command {
 
 			confDir := filepath.Join(root, "config")
 
-			g, err := newGeneratorFromFlags(flags)
+			opts, err := flags.options()
 			if err != nil {
 				return err
 			}
+
+			svc, err := resolveGenerator(app)
+			if err != nil {
+				return err
+			}
+
+			var actions []generator.Action
 
 			names := args
 			if all {
@@ -73,17 +83,19 @@ func newPublishCommand() *cobra.Command {
 					return fmt.Errorf("unknown component %q (known: %s)", name, strings.Join(publishableNames(), ", "))
 				}
 
-				n, err := g.publishAll(src, ".toml", confDir)
+				acts, err := svc.PublishAll(src, ".toml", confDir, opts)
 				if err != nil {
 					return fmt.Errorf("publish %s: %w", name, err)
 				}
 
-				if n == 0 {
-					g.record("skip", name, "no files to publish")
+				if len(acts) == 0 {
+					acts = []generator.Action{{Kind: "skip", Path: name, Detail: "no files to publish"}}
 				}
+
+				actions = append(actions, acts...)
 			}
 
-			return g.report()
+			return report(cmd.OutOrStdout(), actions, opts, flags.format)
 		},
 	}
 

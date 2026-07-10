@@ -1,4 +1,4 @@
-package main
+package command
 
 import (
 	"fmt"
@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/jordanbrauer/hex/cmd/hex/infrastructure/embedfs"
 )
 
 // tlField is one field of a Teal record: a name and its (raw) type or
@@ -88,7 +90,7 @@ func parseTealStub(path string) (tlModule, error) {
 // hand-authored preamble plus the parsed Lua type stubs. Function
 // signatures are emitted verbatim in Teal notation.
 func renderHex3() (string, error) {
-	intro, err := manTemplatesFS.ReadFile("mantemplates/hex.3.intro.md")
+	intro, err := embedfs.ManTemplate("hex.3.intro.md")
 	if err != nil {
 		return "", fmt.Errorf("read hex.3 intro: %w", err)
 	}
