@@ -42,5 +42,12 @@ Generators auto-wire code by inserting above marker comments —
 remove these markers**; they are how `hex make:*` finds where to register new
 code.
 
+# PLUGINS
+
+`hex` looks for repo-local commands under `.hex/command/` (relative to the
+current directory) and mounts each one it finds, written in Lua, Teal, or
+Fennel. A missing `.hex/` is not an error. See **hex**(7) for the plugin
+directory convention and the Lua API scripts run against.
+
 See **hex**(7) for the full conventions guide, **hex**(5) for the config
 file formats, and **hex**(3) for the embedded Lua API.

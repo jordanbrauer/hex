@@ -67,6 +67,119 @@ these markers** — they are how **hex**(1) finds where to register new code.
 `// hex:repl`
 :   in `app/provider/repl_bindings.go` — Lua REPL module bindings.
 
+# COMMAND PLUGINS
+
+`hex` mounts repo-local commands from `.hex/command/` (relative to the
+current working directory) onto its own command tree at startup. A missing
+`.hex/command/` is a silent no-op — existing repos are unaffected.
+
+A plugin is a directory containing a manifest and an entrypoint:
+
+```
+.hex/command/hello/
+├── config.toml
+└── run.lua
+```
+
+`config.toml`:
+
+```toml
+use   = "hello"
+short = "Say hello to someone"
+
+[flags]
+name = { type = "string", usage = "who to greet", value = "world", short = "n" }
+loud = { type = "bool", usage = "shout the greeting", value = false }
+```
+
+`run.lua`:
+
+```lua
+local name = cmd.flags().get_string("name")
+local greeting = "Hello, " .. name .. "!"
+if cmd.flags().get_boolean("loud") then
+  greeting = string.upper(greeting)
+end
+print(greeting)
+```
+
+## Manifest
+
+`use` *(required)*
+:   the command name.
+
+`aliases`
+:   alternate names for the command.
+
+`short`, `long`
+:   help text.
+
+`commands`
+:   names of child directories to mount as subcommands. A directory with
+    `commands` but no `run.*` is a parent-only command (like `hex make:`).
+
+`[flags]`
+:   a table of flag definitions, keyed by flag name. Each entry sets `type`
+    (`string`/`str`, `bool`/`boolean`, or `number`, optionally suffixed
+    `[]` for the slice variant), `usage`, `value` (the default), and
+    optionally `short` (a one-letter alias).
+
+## Entrypoints
+
+`run.{lua,tl,fnl}`
+:   runs when the command executes (`cmd.RunE`). Exactly one of the three
+    extensions may be present — Teal and Fennel both compile through hex's
+    embedded runtime, same as **hex run**.
+
+`args.{lua,tl,fnl}`
+:   optional positional-argument validation (`cmd.Args`), same rule.
+
+Subcommands nest by directory: list a child directory's name in the
+parent's `commands`, and give the child its own `config.toml` and
+entrypoint.
+
+## Plugin Lua API
+
+Every invocation gets a fresh Lua environment (state does not leak between
+runs), with the following available in addition to any `require`-able
+module the entrypoint pulls in on its own:
+
+`argv`, `argc`
+:   the command's positional arguments, as a 1-indexed table and its count.
+
+`cmd.name`, `cmd.path`
+:   the command's name and full invocation path.
+
+`cmd.flags()`
+:   returns a table of flag accessors: `get_string`/`get_string_arr`,
+    `get_boolean`/`get_boolean_arr`, `get_number`/`get_number_arr`,
+    `changed(name)`, `has_flags()` — reading the flags declared in
+    `config.toml`.
+
+`dump(value)`
+:   pretty-prints a Lua value (tables recursively) to stdout, headed by
+    the calling script's source location. Debugging only.
+
+`explode(s, sep)`
+:   splits `s` on `sep` into a table.
+
+`sleep(ms)`
+:   blocks for `ms` milliseconds.
+
+`require("disk")`
+:   the file-writing primitive plugin scripts use to generate files:
+    `disk.write(path, content)`, `disk.append(path, content)`,
+    `disk.erase(path)`, `disk.exists(path)`, `disk.mkdir(path)`,
+    `disk.touch(path)`. Each returns `(result, err)`, with `err` `nil` on
+    success (matching hex's Lua error convention — see **hex**(3)).
+
+`require("log")`
+:   the same `log` module documented in **hex**(3).
+
+Plugin scripts run with the full Lua standard library available (same
+posture as **hex run**). Treat a plugin the same as any other code checked
+into the repo it lives in — this is not a sandbox for untrusted code.
+
 # PROVIDER LIFECYCLE
 
 A service provider is a struct (usually embedding `provider.Base`) with up to
