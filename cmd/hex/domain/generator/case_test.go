@@ -1,4 +1,4 @@
-package main
+package generator
 
 import "testing"
 
@@ -15,8 +15,8 @@ func TestPascalCase(t *testing.T) {
 	}
 
 	for in, want := range tests {
-		if got := pascalCase(in); got != want {
-			t.Errorf("pascalCase(%q) = %q, want %q", in, got, want)
+		if got := PascalCase(in); got != want {
+			t.Errorf("PascalCase(%q) = %q, want %q", in, got, want)
 		}
 	}
 }
@@ -29,8 +29,8 @@ func TestCamelCase(t *testing.T) {
 	}
 
 	for in, want := range tests {
-		if got := camelCase(in); got != want {
-			t.Errorf("camelCase(%q) = %q, want %q", in, got, want)
+		if got := CamelCase(in); got != want {
+			t.Errorf("CamelCase(%q) = %q, want %q", in, got, want)
 		}
 	}
 }
@@ -44,8 +44,8 @@ func TestSnakeCase(t *testing.T) {
 	}
 
 	for in, want := range tests {
-		if got := snakeCase(in); got != want {
-			t.Errorf("snakeCase(%q) = %q, want %q", in, got, want)
+		if got := SnakeCase(in); got != want {
+			t.Errorf("SnakeCase(%q) = %q, want %q", in, got, want)
 		}
 	}
 }
@@ -63,8 +63,8 @@ func TestPluralise(t *testing.T) {
 	}
 
 	for in, want := range tests {
-		if got := pluralise(in); got != want {
-			t.Errorf("pluralise(%q) = %q, want %q", in, got, want)
+		if got := Pluralise(in); got != want {
+			t.Errorf("Pluralise(%q) = %q, want %q", in, got, want)
 		}
 	}
 }
@@ -81,8 +81,8 @@ func TestGoPackageName(t *testing.T) {
 	}
 
 	for in, want := range tests {
-		if got := goPackageName(in); got != want {
-			t.Errorf("goPackageName(%q) = %q, want %q", in, got, want)
+		if got := GoPackageName(in); got != want {
+			t.Errorf("GoPackageName(%q) = %q, want %q", in, got, want)
 		}
 	}
 }

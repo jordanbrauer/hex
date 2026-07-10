@@ -1,15 +1,17 @@
-package main
+package command
 
 import (
 	"bytes"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
+
+	"github.com/jordanbrauer/hex"
+	"github.com/jordanbrauer/hex/cmd/hex/domain/generator"
 )
 
 // controllerAction describes one RESTful action: which HTTP verb + URL
@@ -36,6 +38,8 @@ var allControllerActions = []struct {
 
 // controllerData feeds the controller template.
 type controllerData struct {
+	// Package is the lower-case file/package-relative name (e.g. "users").
+	Package string
 	// Struct is the PascalCase struct name (e.g. "Users").
 	Struct string
 	// Constructor is the pascalCase constructor name (e.g. "NewUsers").
@@ -49,7 +53,7 @@ type controllerData struct {
 	Actions []controllerAction
 }
 
-func newMakeControllerCommand() *cobra.Command {
+func newMakeControllerCommand(app *hex.App) *cobra.Command {
 	var (
 		all     bool
 		actions string
@@ -77,36 +81,48 @@ func newMakeControllerCommand() *cobra.Command {
 				return err
 			}
 
-			pkg := goPackageName(name)  // "users"
-			struct_ := pascalCase(name) // "Users"
+			pkg := generator.GoPackageName(name)
+			struct_ := generator.PascalCase(name)
 
 			data := controllerData{
+				Package:     pkg,
 				Struct:      struct_,
 				Constructor: "New" + struct_,
 				Path:        "/" + pkg,
-				Variable:    camelCase(name),
+				Variable:    generator.CamelCase(name),
 				Actions:     selected,
 			}
 
-			// 1. Scaffold app/controller/<name>.go.
-			target := filepath.Join(root, "app", "controller", pkg+".go")
-
-			g, err := newGeneratorFromFlags(flags)
+			opts, err := flags.options()
 			if err != nil {
 				return err
 			}
 
-			if err := g.render("templates/controller.go.tmpl", target, data); err != nil {
+			svc, err := resolveGenerator(app)
+			if err != nil {
 				return err
 			}
 
-			// 2. Wire routes into app/provider/routes.go.
+			ctx := cmd.Context()
+
+			// 1. Scaffold app/controller/<name>.go.
+			actionsDone, err := svc.Run(ctx, "controller", root, data, opts)
+			if err != nil {
+				return err
+			}
+
+			// 2. Wire routes into app/provider/routes.go. Multi-target,
+			// data-dependent wiring — not a static Blueprint Wire.
 			routesFile := filepath.Join(root, "app", "provider", "routes.go")
-			if err := wireControllerRoutes(g, routesFile, modulePath, data); err != nil {
+
+			wireActions, err := wireControllerRoutes(svc, routesFile, modulePath, data, opts)
+			actionsDone = append(actionsDone, wireActions...)
+
+			if err != nil {
 				return err
 			}
 
-			return g.report()
+			return report(cmd.OutOrStdout(), actionsDone, opts, flags.format)
 		},
 	}
 
@@ -197,11 +213,18 @@ func actionRank(method string) int {
 // wireControllerRoutes converts the controller/<pkg> blank import in
 // routes.go into a non-blank one (if needed), then inserts the
 // route-registration lines above the hex:routes marker.
-func wireControllerRoutes(g *generator, routesFile, modulePath string, data controllerData) error {
+func wireControllerRoutes(svc *generator.Service, routesFile, modulePath string, data controllerData, opts generator.Options) ([]generator.Action, error) {
+	var actions []generator.Action
+
 	// Promote blank controller import to a real one, once. Idempotent:
 	// no-op after the first controller is scaffolded.
-	if err := g.promoteImport(routesFile, modulePath+"/app/controller"); err != nil {
-		return err
+	act, err := svc.PromoteImport(routesFile, modulePath+"/app/controller", opts)
+	if err != nil {
+		return actions, err
+	}
+
+	if act != nil {
+		actions = append(actions, *act)
 	}
 
 	var b bytes.Buffer
@@ -212,34 +235,19 @@ func wireControllerRoutes(g *generator, routesFile, modulePath string, data cont
 			methodCall(a.Verb), data.Path, a.Suffix, data.Variable, a.Method)
 	}
 
-	if err := g.wireMarker(routesFile, "// hex:routes", b.String(), "added "+data.Struct); err != nil {
-		return fmt.Errorf("wire routes into %s: %w", routesFile, err)
+	wireAct, err := svc.WireMarker(routesFile, "// hex:routes", b.String(), "added "+data.Struct, opts)
+	if err != nil {
+		return actions, fmt.Errorf("wire routes into %s: %w", routesFile, err)
 	}
 
-	return nil
+	if wireAct != nil {
+		actions = append(actions, *wireAct)
+	}
+
+	return actions, nil
 }
 
 // methodCall maps an HTTP verb to echo.Echo's method name. GET → "GET",
 // POST → "POST", etc. — they happen to match one-for-one, but keeping
 // this helper isolates any future divergence.
 func methodCall(verb string) string { return strings.ToUpper(verb) }
-
-// promoteBlankImport rewrites the underscore-blank form of an import
-// into a normal import so name references compile. Idempotent.
-func promoteBlankImport(file, importPath string) error {
-	data, err := os.ReadFile(file)
-	if err != nil {
-		return fmt.Errorf("read %s: %w", file, err)
-	}
-
-	blank := fmt.Sprintf(`_ %q`, importPath)
-	real_ := fmt.Sprintf(`%q`, importPath)
-
-	if !bytes.Contains(data, []byte(blank)) {
-		return nil // already promoted or never blank
-	}
-
-	out := bytes.ReplaceAll(data, []byte(blank), []byte(real_))
-
-	return os.WriteFile(file, out, 0o644)
-}

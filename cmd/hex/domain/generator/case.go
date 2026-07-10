@@ -1,12 +1,12 @@
-package main
+package generator
 
 import (
 	"strings"
 	"unicode"
 )
 
-// pascalCase converts foo-bar_baz -> FooBarBaz.
-func pascalCase(s string) string {
+// PascalCase converts foo-bar_baz -> FooBarBaz.
+func PascalCase(s string) string {
 	if s == "" {
 		return s
 	}
@@ -19,19 +19,19 @@ func pascalCase(s string) string {
 	return strings.Join(fields, "")
 }
 
-// camelCase converts foo-bar_baz -> fooBarBaz.
-func camelCase(s string) string {
+// CamelCase converts foo-bar_baz -> fooBarBaz.
+func CamelCase(s string) string {
 	if s == "" {
 		return s
 	}
 
-	p := pascalCase(s)
+	p := PascalCase(s)
 
 	return strings.ToLower(p[:1]) + p[1:]
 }
 
-// snakeCase converts fooBar / foo-bar -> foo_bar.
-func snakeCase(s string) string {
+// SnakeCase converts fooBar / foo-bar -> foo_bar.
+func SnakeCase(s string) string {
 	var b strings.Builder
 
 	for i, r := range s {
@@ -52,8 +52,8 @@ func snakeCase(s string) string {
 	return b.String()
 }
 
-// titleCase upper-cases the first letter and leaves the rest alone.
-func titleCase(s string) string {
+// TitleCase upper-cases the first letter and leaves the rest alone.
+func TitleCase(s string) string {
 	if s == "" {
 		return s
 	}
@@ -61,9 +61,9 @@ func titleCase(s string) string {
 	return strings.ToUpper(s[:1]) + s[1:]
 }
 
-// goPackageName produces a valid Go package identifier from an arbitrary
+// GoPackageName produces a valid Go package identifier from an arbitrary
 // name — lower-cased, non-alphanumeric characters stripped.
-func goPackageName(s string) string {
+func GoPackageName(s string) string {
 	var b strings.Builder
 
 	for _, r := range strings.ToLower(s) {
@@ -75,10 +75,10 @@ func goPackageName(s string) string {
 	return b.String()
 }
 
-// pluralise applies a very small English pluralisation table. Good enough
+// Pluralise applies a very small English pluralisation table. Good enough
 // for the domain generator's default naming; consumers with irregular
 // nouns pass an explicit table name to the migration generator.
-func pluralise(s string) string {
+func Pluralise(s string) string {
 	if s == "" {
 		return s
 	}
@@ -109,7 +109,7 @@ func isVowel(b byte) bool {
 }
 
 // splitIdentifier breaks a mixed-style identifier into lowercase word
-// segments — used by pascalCase / camelCase.
+// segments — used by PascalCase / CamelCase.
 func splitIdentifier(s string) []string {
 	var (
 		out   []string

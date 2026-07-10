@@ -1,7 +1,6 @@
-package main
+package command
 
 import (
-	"embed"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,13 +8,10 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-)
 
-// manTemplatesFS holds the hand-authored prose blocks that the manpage
-// generator wraps around auto-generated content.
-//
-//go:embed mantemplates
-var manTemplatesFS embed.FS
+	"github.com/jordanbrauer/hex"
+	"github.com/jordanbrauer/hex/cmd/hex/infrastructure/embedfs"
+)
 
 // newGenManCommand builds the hidden `hex gen-man` command. It regenerates
 // the *generated* manpage markdown sources under docs/man/ (currently
@@ -75,8 +71,12 @@ func newGenManCommand() *cobra.Command {
 // DESCRIPTION, CONVENTIONS) followed by an auto-generated COMMANDS section.
 // Because it reads cmd.Long/cmd.Example off the tree, the page stays in
 // sync with the CLI and its embedded help files.
+//
+// The tree is built from a fresh, unbootstrapped *hex.App — gen-man only
+// introspects Use/Short/Long/Example/Flags, it never executes a
+// command's RunE, so no provider needs to have run.
 func renderHex1() (string, error) {
-	intro, err := manTemplatesFS.ReadFile("mantemplates/hex.1.intro.md")
+	intro, err := embedfs.ManTemplate("hex.1.intro.md")
 	if err != nil {
 		return "", fmt.Errorf("read hex.1 intro: %w", err)
 	}
@@ -91,7 +91,7 @@ func renderHex1() (string, error) {
 
 	b.WriteString("\n# COMMANDS\n\n")
 
-	for _, c := range newRoot().Commands() {
+	for _, c := range Root(hex.New()).Commands() {
 		if skipInManpage(c) {
 			continue
 		}

@@ -1,4 +1,7 @@
-// Command hex is the scaffolding CLI for hex applications.
+// Command hex is the scaffolding CLI for hex applications. It is itself
+// a hex app: it boots through hex.New(), registers its own providers in
+// app/boot.go, and builds its cobra tree in app/command/root.go — the
+// same shape `hex init` scaffolds for any consumer app.
 //
 // Usage:
 //
@@ -11,82 +14,33 @@
 package main
 
 import (
-	"fmt"
+	"context"
 	"os"
 
-	"github.com/spf13/cobra"
+	"github.com/jordanbrauer/hex"
+	hexcli "github.com/jordanbrauer/hex/cli"
+	hexlog "github.com/jordanbrauer/hex/log"
 
-	"github.com/jordanbrauer/hex/build"
-	"github.com/jordanbrauer/hex/lua/plugin"
+	"github.com/jordanbrauer/hex/cmd/hex/app"
+	"github.com/jordanbrauer/hex/cmd/hex/app/command"
 )
 
-// commandPluginDir is where hex looks for repo-local command plugins
-// (Lua/Teal/Fennel), relative to the current working directory. A
-// missing directory is not an error — see plugin.LoadInto.
-const commandPluginDir = ".hex/command"
-
-// commandPluginGroup groups repo-local plugin commands under their
-// own heading in `hex --help`, separate from hex's built-in commands.
-var commandPluginGroup = plugin.Group{ID: "plugins", Title: "Plugins:"}
-
 func main() {
-	root := newRoot()
+	hexlog.Init()
 
-	if err := root.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, "error:", err)
-		os.Exit(1)
-	}
-}
+	kernel := hex.New()
 
-func newRoot() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "hex",
-		Short: "Scaffolding CLI for hex applications",
-		Long: "hex is the scaffolding CLI for the hex Go framework.\n" +
-			"Create new projects with `hex init` and add code with `hex make:*`.",
-		Version:       hexVersion(),
-		SilenceUsage:  true,
-		SilenceErrors: true,
+	if err := app.Boot(kernel); err != nil {
+		hexlog.Fatal("register providers", "error", err)
 	}
 
-	cmd.CompletionOptions.HiddenDefaultCmd = true
+	ctx := context.Background()
 
-	cmd.AddCommand(
-		newInitCommand(),
-		newPublishCommand(),
-		newRunCommand(),
-		newReplCommand(),
-		newMakeProviderCommand(),
-		newMakeDomainCommand(),
-		newMakeMigrationCommand(),
-		newMakeCommandCommand(),
-		newMakeAdapterCommand(),
-		newMakeControllerCommand(),
-		newGenManCommand(),
-	)
-
-	loadCommandPlugins(cmd)
-
-	return cmd
-}
-
-// loadCommandPlugins mounts repo-local plugins found under
-// commandPluginDir (".hex/command", relative to cwd) onto cmd. A
-// missing directory is a silent no-op. A malformed plugin only warns
-// — it must not prevent the rest of hex's commands from working.
-func loadCommandPlugins(cmd *cobra.Command) {
-	exec := plugin.NewRuntimeExecutor()
-
-	if err := plugin.LoadInto(cmd, commandPluginGroup, []string{commandPluginDir}, exec); err != nil {
-		fmt.Fprintln(os.Stderr, "warning: loading", commandPluginDir, "plugins:", err)
-	}
-}
-
-func hexVersion() string {
-	v := build.Version()
-	if v == build.UnknownVersion {
-		return "dev (" + build.ShortCommit() + ")"
+	if err := kernel.Bootstrap(ctx); err != nil {
+		hexlog.Fatal("bootstrap", "error", err)
 	}
 
-	return v
+	defer func() { _ = kernel.Shutdown(ctx) }()
+
+	os.Exit(hexcli.Execute(command.Root(kernel)))
 }

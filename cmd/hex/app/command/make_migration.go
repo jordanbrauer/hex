@@ -1,12 +1,13 @@
-package main
+package command
 
 import (
 	"errors"
-	"fmt"
-	"path/filepath"
 	"time"
 
 	"github.com/spf13/cobra"
+
+	"github.com/jordanbrauer/hex"
+	"github.com/jordanbrauer/hex/cmd/hex/domain/generator"
 )
 
 // migrationData is available inside migration templates via
@@ -17,7 +18,7 @@ type migrationData struct {
 	Timestamp string // "20260708120000"
 }
 
-func newMakeMigrationCommand() *cobra.Command {
+func newMakeMigrationCommand(app *hex.App) *cobra.Command {
 	var flags genFlags
 
 	cmd := &cobra.Command{
@@ -31,7 +32,7 @@ func newMakeMigrationCommand() *cobra.Command {
 				return err
 			}
 
-			name := snakeCase(args[0])
+			name := generator.SnakeCase(args[0])
 			if name == "" {
 				return errors.New("migration name is empty")
 			}
@@ -42,26 +43,22 @@ func newMakeMigrationCommand() *cobra.Command {
 				Timestamp: time.Now().UTC().Format("20060102150405"),
 			}
 
-			base := fmt.Sprintf("%s_%s", data.Timestamp, data.Name)
-			dir := filepath.Join(root, "database", "migrations")
-
-			files := []struct{ tpl, target string }{
-				{"templates/migration.up.sql.tmpl", filepath.Join(dir, base+".up.sql")},
-				{"templates/migration.down.sql.tmpl", filepath.Join(dir, base+".down.sql")},
-			}
-
-			g, err := newGeneratorFromFlags(flags)
+			opts, err := flags.options()
 			if err != nil {
 				return err
 			}
 
-			for _, f := range files {
-				if err := g.render(f.tpl, f.target, data); err != nil {
-					return err
-				}
+			svc, err := resolveGenerator(app)
+			if err != nil {
+				return err
 			}
 
-			return g.report()
+			actions, err := svc.Run(cmd.Context(), "migration", root, data, opts)
+			if err != nil {
+				return err
+			}
+
+			return report(cmd.OutOrStdout(), actions, opts, flags.format)
 		},
 	}
 

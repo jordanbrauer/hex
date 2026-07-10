@@ -1,14 +1,16 @@
-package main
+package command
 
 import (
 	"errors"
 	"fmt"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
+
+	"github.com/jordanbrauer/hex"
+	"github.com/jordanbrauer/hex/cmd/hex/domain/generator"
 )
 
-// adapterData feeds the adapter template.
+// adapterData feeds the adapter blueprint.
 type adapterData struct {
 	Domain     string // package name of the domain ("user")
 	DomainType string // exported type name ("User")
@@ -16,7 +18,7 @@ type adapterData struct {
 	ModulePath string
 }
 
-func newMakeAdapterCommand() *cobra.Command {
+func newMakeAdapterCommand(app *hex.App) *cobra.Command {
 	var (
 		dialect string
 		flags   genFlags
@@ -43,24 +45,28 @@ func newMakeAdapterCommand() *cobra.Command {
 			}
 
 			data := adapterData{
-				Domain:     goPackageName(domain),
-				DomainType: pascalCase(domain),
+				Domain:     generator.GoPackageName(domain),
+				DomainType: generator.PascalCase(domain),
 				Dialect:    dialect,
 				ModulePath: modulePath,
 			}
 
-			target := filepath.Join(root, "infrastructure", dialect, data.Domain+"_repository.go")
-
-			g, err := newGeneratorFromFlags(flags)
+			opts, err := flags.options()
 			if err != nil {
 				return err
 			}
 
-			if err := g.render("templates/adapter.go.tmpl", target, data); err != nil {
+			svc, err := resolveGenerator(app)
+			if err != nil {
 				return err
 			}
 
-			return g.report()
+			actions, err := svc.Run(cmd.Context(), "adapter", root, data, opts)
+			if err != nil {
+				return err
+			}
+
+			return report(cmd.OutOrStdout(), actions, opts, flags.format)
 		},
 	}
 

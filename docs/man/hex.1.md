@@ -460,18 +460,13 @@ hex publish web --force
 
 ## hex repl
 
-Launch an interactive REPL that evaluates Teal by default. Use `--mode` to start
-in Lua or Fennel instead.
+Opens an interactive Teal (default) or Lua REPL against
+the app's shared Lua environment. Every module registered
+by framework and consumer providers is available via
+require(). Use `global x: T = v` in Teal mode to declare
+variables that persist across lines.
 
-In interactive mode, switch languages on the fly at an empty prompt: `t` for
-Teal, `l` for Lua, `f` for Fennel. Backspace on an empty prompt in a non-default
-mode returns to the language you launched with.
-
-The runtime is bare gopher-lua plus the requested compiler; no hex modules are
-pre-loaded. Scaffolded apps get a container-aware REPL via `<appname> repl`,
-which has access to `db`, `cache`, `config`, and whatever the app registers.
-
-Exit with Ctrl+D, `exit`, or `quit`.
+Exit with Ctrl+D, "exit", or "quit".
 
 Usage:
 
@@ -482,37 +477,18 @@ hex repl [flags]
 Options:
 
 `--mode` *string*
-:   starting language: teal (default), lua, fennel
-
-Examples:
-
-```sh
-# Start the REPL in Teal (the default)
-hex repl
-
-# Start in Lua
-hex repl --mode lua
-
-# Start in Fennel
-hex repl --mode fnl
-```
+:   override configured mode: teal | lua
 
 ## hex run
 
-Run an arbitrary Lua (`.lua`), Teal (`.tl`), or Fennel (`.fnl`) script or inline
-code through hex's embedded runtime.
+Executes a script inside the app's shared Lua environment,
+so every module registered by framework and consumer
+providers (db, config, log, env, events, cache, queue, …)
+is directly available.
 
-Source can come from three mutually-exclusive places: a file argument (the
-extension picks the language), `-` to read from stdin, or `-c` for inline code.
-`--lang` forces the language for inline/stdin source (it is ignored for file
-arguments, where the extension wins).
-
-Use `--check` to validate without executing: the Teal type-checker for `.tl`,
-the Fennel compiler for `.fnl`, and the Lua parser for `.lua`.
-
-The runtime is bare gopher-lua plus the requested compiler; no hex modules
-(`db`, `cache`, `agent`, …) are pre-registered. For app-scoped execution with
-access to registered modules, use the `repl` command on your scaffolded app.
+Source can come from a file arg, --code, or stdin (`-`).
+File extensions (.lua, .tl, .fnl) pick the language;
+--lang forces it for inline/stdin source.
 
 Usage:
 
@@ -526,29 +502,10 @@ Options:
 :   validate syntax/types without executing
 
 `--code`, `-c` *string*
-:   inline source code (mutually exclusive with a file arg)
+:   inline source (mutually exclusive with a file arg)
 
 `--lang` *string*
-:   force language for inline/stdin source: lua, teal, fennel (irrelevant for file args)
-
-Examples:
-
-```sh
-# Run a Teal script (language inferred from the extension)
-hex run script.tl
-
-# Run inline Lua
-hex run -c 'print("hello from lua")'
-
-# Run inline Fennel
-hex run -c '(print "hello")' --lang fnl
-
-# Pipe a script in via stdin
-echo 'print(1 + 1)' | hex run -
-
-# Type-check a Teal file without running it
-hex run script.tl --check
-```
+:   force language for inline/stdin source: lua, teal, fennel
 
 # SEE ALSO
 

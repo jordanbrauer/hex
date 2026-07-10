@@ -1,6 +1,7 @@
-package main
+package command
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -16,6 +17,9 @@ import (
 	logprovider "github.com/jordanbrauer/hex/log/provider"
 	luaprovider "github.com/jordanbrauer/hex/lua/provider"
 	webprovider "github.com/jordanbrauer/hex/web/provider"
+
+	"github.com/jordanbrauer/hex"
+	"github.com/jordanbrauer/hex/cmd/hex/domain/generator"
 )
 
 // initConfig is populated from flags + prompts and threaded into the
@@ -130,7 +134,7 @@ func githubSlug(modulePath string) (owner, repo string, ok bool) {
 	return parts[0], parts[1], true
 }
 
-func newInitCommand() *cobra.Command {
+func newInitCommand(app *hex.App) *cobra.Command {
 	var (
 		modulePath    string
 		dialect       string
@@ -181,20 +185,26 @@ func newInitCommand() *cobra.Command {
 				return err
 			}
 
-			g, err := newGeneratorFromFlags(flags)
+			opts, err := flags.options()
 			if err != nil {
 				return err
 			}
 
-			if err := scaffold(g, cfg); err != nil {
+			svc, err := resolveGenerator(app)
+			if err != nil {
 				return err
 			}
 
-			if err := g.report(); err != nil {
+			actions, err := scaffold(cmd.Context(), svc, cfg, opts)
+			if err != nil {
 				return err
 			}
 
-			if g.format != "json" && !g.dryRun {
+			if err := report(cmd.OutOrStdout(), actions, opts, flags.format); err != nil {
+				return err
+			}
+
+			if flags.format != "json" && !opts.DryRun {
 				printInitSuccess(cfg)
 			}
 
@@ -573,17 +583,21 @@ func (c *initConfig) applyToolingDefaults() {
 	}
 }
 
-// scaffold materialises the project files at cfg.Directory using the
-// configured generator (honouring its dry-run / force / output settings).
-func scaffold(g *generator, cfg initConfig) error {
-	if !g.force {
+// scaffold materialises the project files at cfg.Directory using svc,
+// honouring opts (dry-run / force / output format).
+func scaffold(ctx context.Context, svc *generator.Service, cfg initConfig, opts generator.Options) ([]generator.Action, error) {
+	var actions []generator.Action
+
+	if !opts.Force {
 		if _, err := os.Stat(filepath.Join(cfg.Directory, "go.mod")); err == nil {
-			return fmt.Errorf("%s already contains a go.mod (use --force to overwrite)", cfg.Directory)
+			return actions, fmt.Errorf("%s already contains a go.mod (use --force to overwrite)", cfg.Directory)
 		}
 	}
 
-	if err := g.mkdirp(cfg.Directory); err != nil {
-		return err
+	if act, err := svc.Mkdirp(cfg.Directory, opts); err != nil {
+		return actions, err
+	} else if act != nil {
+		actions = append(actions, *act)
 	}
 
 	files := coreFiles(cfg)
@@ -649,13 +663,19 @@ func scaffold(g *generator, cfg initConfig) error {
 	}
 
 	for _, f := range files {
-		if err := g.render(f.template, f.target, cfg); err != nil {
-			return err
+		act, err := svc.RenderFile(ctx, f.template, f.target, cfg, opts)
+		if err != nil {
+			return actions, err
 		}
+
+		actions = append(actions, act)
 	}
 
-	if err := publishFrameworkConfigs(g, cfg); err != nil {
-		return err
+	publishActions, err := publishFrameworkConfigs(svc, cfg, opts)
+	actions = append(actions, publishActions...)
+
+	if err != nil {
+		return actions, err
 	}
 
 	// Empty directories worth committing.
@@ -666,8 +686,10 @@ func scaffold(g *generator, cfg initConfig) error {
 	}
 
 	for _, d := range dirs {
-		if err := g.mkdirp(d); err != nil {
-			return err
+		if act, err := svc.Mkdirp(d, opts); err != nil {
+			return actions, err
+		} else if act != nil {
+			actions = append(actions, *act)
 		}
 
 		keep := filepath.Join(d, ".gitkeep")
@@ -675,12 +697,15 @@ func scaffold(g *generator, cfg initConfig) error {
 			continue
 		}
 
-		if err := g.write(keep, []byte{}); err != nil {
-			return err
+		act, err := svc.WriteRaw(keep, []byte{}, opts)
+		if err != nil {
+			return actions, err
 		}
+
+		actions = append(actions, act)
 	}
 
-	return nil
+	return actions, nil
 }
 
 // fileSpec is a template→target rendering job.
@@ -720,31 +745,45 @@ func coreFiles(cfg initConfig) []fileSpec {
 // database dsn, the telemetry service_name — are still emitted from
 // templates because they need per-app substitution; publish covers
 // the universal-defaults cases.
-func publishFrameworkConfigs(g *generator, cfg initConfig) error {
+func publishFrameworkConfigs(svc *generator.Service, cfg initConfig, opts generator.Options) ([]generator.Action, error) {
+	var actions []generator.Action
+
 	confDir := filepath.Join(cfg.Directory, "config")
 
 	// Log always publishes (log provider is always registered).
-	if _, err := g.publishAll(logprovider.Configs(), ".toml", confDir); err != nil {
-		return err
+	acts, err := svc.PublishAll(logprovider.Configs(), ".toml", confDir, opts)
+	actions = append(actions, acts...)
+
+	if err != nil {
+		return actions, err
 	}
 
 	// Lua always publishes (Lua provider is always registered so
 	// `<app> repl` works out of the box).
-	if _, err := g.publishAll(luaprovider.Configs(), ".toml", confDir); err != nil {
-		return err
+	acts, err = svc.PublishAll(luaprovider.Configs(), ".toml", confDir, opts)
+	actions = append(actions, acts...)
+
+	if err != nil {
+		return actions, err
 	}
 
 	// Cache: universal defaults, no per-app content.
 	if cfg.Cache {
-		if _, err := g.publishAll(cacheprovider.Configs(), ".toml", confDir); err != nil {
-			return err
+		acts, err = svc.PublishAll(cacheprovider.Configs(), ".toml", confDir, opts)
+		actions = append(actions, acts...)
+
+		if err != nil {
+			return actions, err
 		}
 	}
 
 	// Web: universal defaults, no per-app content.
 	if cfg.Web {
-		if _, err := g.publishAll(webprovider.Configs(), ".toml", confDir); err != nil {
-			return err
+		acts, err = svc.PublishAll(webprovider.Configs(), ".toml", confDir, opts)
+		actions = append(actions, acts...)
+
+		if err != nil {
+			return actions, err
 		}
 	}
 
@@ -757,7 +796,7 @@ func publishFrameworkConfigs(g *generator, cfg initConfig) error {
 	// module's Configs() and are read at runtime via Sources. Consumer
 	// adds their own per-namespace constraints in config/schema.cue.
 
-	return nil
+	return actions, nil
 }
 
 func databaseFiles(cfg initConfig) []fileSpec {

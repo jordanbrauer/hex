@@ -59,8 +59,8 @@ surfaced, notably:
 - `tui/markup.go:parse` — cognitive complexity **109** (extreme outlier)
 - `tui/components/repl.go:(Model).Update` — **51**
 - `config/config.go:Load` — **32**
-- `cmd/hex/init.go:scaffold` — **30**
-- Several more in the high-teens/20s across `cmd/hex/init.go`,
+- `cmd/hex/app/command/init.go:scaffold` — **30**
+- Several more in the high-teens/20s across `cmd/hex/app/command/init.go`,
   `config/`, `lua/repl/`, `httpx/`
 
 This isn't a judgment that those functions are wrong — some (a large

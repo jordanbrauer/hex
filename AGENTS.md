@@ -47,7 +47,13 @@ not the app template.
 ├── <package>/<driver>/ # subpackages for driver / backend impls,
 │                       #   e.g. db/{sqlite,postgres}, cache/memory,
 │                       #   disk/local, queue/{memory,sqlite}
-├── cmd/hex/            # the scaffolding CLI
+├── cmd/hex/            # the scaffolding CLI — itself a hex app: main.go
+│                       #   boots hex.New(), app/boot.go + app/provider/
+│                       #   + app/command/ mirror what `hex init` scaffolds,
+│                       #   and domain/generator + infrastructure/embedfs
+│                       #   model the generator engine as a domain (see
+│                       #   cmd/hex's own AGENTS-style comments before
+│                       #   editing make_*.go)
 ├── examples/           # runnable example apps (ai-lua, swapi, …)
 └── docs/               # PLAN, ADRs, designs, reference docs
 ```
