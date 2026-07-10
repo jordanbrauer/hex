@@ -1,0 +1,30 @@
+version: 2
+
+updates:
+  # Root module + every submodule that ships its own go.mod (examples/).
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      # Bundle every non-major go.mod bump into one PR instead of one
+      # per dependency — direct deps are wrapped intentionally (see
+      # AGENTS.md's dependency table), so patch/minor bumps are routine
+      # and reviewed as a batch. Majors still get their own PR since
+      # they may need an ADR / wrapper-code changes.
+      go-dependencies:
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: gomod
+    directory: /examples/swapi
+    schedule:
+      interval: weekly
+
+  # Keep the Actions pinned in ci.yml / release.yml current.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

@@ -1,0 +1,7 @@
+# Blank issues stay enabled for questions/discussion that don't fit the
+# bug or feature templates below.
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/jordanbrauer/hex/security/advisories/new
+    about: Please report vulnerabilities privately — see SECURITY.md. Do not open a public issue.
