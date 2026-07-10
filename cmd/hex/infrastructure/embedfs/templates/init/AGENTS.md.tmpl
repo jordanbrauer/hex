@@ -16,15 +16,15 @@ canonical location, apply the naming conventions, and **auto-wire** it into the
 app — the parts that are easy to get wrong. Preview any generator with
 `--dry-run` (add `--format json` for machine-readable output) before committing.
 
-- `hex make:provider <name>` — a service provider, wired into `app/boot.go`
-- `hex make:domain <name>` — a domain package (entity, repository port, service, errors)
+- `hex make provider <name>` — a service provider, wired into `app/boot.go`
+- `hex make domain <name>` — a domain package (entity, repository port, service, errors)
 {{- if .HasDatabase}}
-- `hex make:migration <name>` — a timestamped SQL migration pair
-- `hex make:adapter <domain>` — a SQL adapter implementing a domain repository
+- `hex make migration <name>` — a timestamped SQL migration pair
+- `hex make adapter <domain>` — a SQL adapter implementing a domain repository
 {{- end}}
-- `hex make:command <name>` — a Cobra command, wired into `app/command/root.go`
+- `hex make command <name>` — a Cobra command, wired into `app/command/root.go`
 {{- if .Web}}
-- `hex make:controller <name>` — an HTTP controller, wired into `app/provider/routes.go`
+- `hex make controller <name>` — an HTTP controller, wired into `app/provider/routes.go`
 {{- end}}
 
 Run `hex make:<cmd> --help` for the full flag set, or `man hex` for all of them.

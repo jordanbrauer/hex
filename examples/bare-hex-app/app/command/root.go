@@ -1,0 +1,44 @@
+// Package command holds this application's cobra command tree.
+package command
+
+import (
+	"github.com/spf13/cobra"
+
+	"github.com/jordanbrauer/hex"
+	"github.com/jordanbrauer/hex/cli"
+	luaprovider "github.com/jordanbrauer/hex/lua/provider"
+
+	"github.com/jordanbrauer/hex/examples/bare-hex-app/app/build"
+)
+
+// Execute builds the command tree wired to app and runs it, returning the
+// process exit code. main is just os.Exit(command.Execute(kernel)).
+func Execute(app *hex.App) int {
+	return cli.Execute(Root(app))
+}
+
+// Root builds the top-level cobra command wired to app. hex make command
+// inserts subcommand registrations above the `// hex:commands` marker
+// below. Do not remove the marker.
+func Root(app *hex.App) *cobra.Command {
+	root := cli.Root(cli.RootOptions{
+		Name:  "bare-hex-app",
+		Short: "bare-hex-app",
+		App:   app,
+	})
+
+	root.AddCommand(cli.Version(cli.VersionOptions{
+		App: build.Info().Name,
+	}))
+
+	// Framework-provided commands. Each framework provider that
+	// exposes a subcommand does so through its provider package.
+	root.AddCommand(luaprovider.ReplCommand(app))
+	root.AddCommand(luaprovider.RunCommand(app))
+
+	root.AddCommand(
+	// hex:commands
+	)
+
+	return root
+}

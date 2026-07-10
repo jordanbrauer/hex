@@ -103,11 +103,11 @@ Sources list, then register the provider in `app/boot.go`. See
 Add code with the `hex` CLI (from the project root):
 
 ```bash
-hex make:provider payments        # app/provider/payments.go, wired into app/boot.go
-hex make:domain user              # domain/user/{user,repository,service,errors}.go
-hex make:migration create_users   # database/migrations/<ts>_create_users.{up,down}.sql
-hex make:command hello            # app/command/hello.go, wired into root cobra tree
-hex make:adapter cache/redis      # infrastructure/cache/redis/redis.go stub
+hex make provider payments        # app/provider/payments.go, wired into app/boot.go
+hex make domain user              # domain/user/{user,repository,service,errors}.go
+hex make migration create_users   # database/migrations/<ts>_create_users.{up,down}.sql
+hex make command hello            # app/command/hello.go, wired into root cobra tree
+hex make adapter cache/redis      # infrastructure/cache/redis/redis.go stub
 ```
 
 ## Build

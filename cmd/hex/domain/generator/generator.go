@@ -1,5 +1,5 @@
 // Package generator is the Generator domain: it describes hex's own
-// make:* generators as data (Blueprint) and records what applying one
+// make generators as data (Blueprint) and records what applying one
 // does (Action). It has no dependency on infrastructure; Repository
 // (repository.go) is the port to the compiled-in template assets.
 package generator
@@ -38,11 +38,11 @@ type WireSpec struct {
 	Detail    string
 }
 
-// Blueprint describes one hex make:* generator: which files it renders
+// Blueprint describes one hex make generator: which files it renders
 // and where, and which existing files it wires new registrations into.
 // The built-in blueprints (provider, domain, adapter, controller,
 // command, migration) are defined by infrastructure/embedfs; a future
-// `hex make:blueprint` could let consumers register their own via
+// `hex make blueprint` could let consumers register their own via
 // Repository.Store.
 type Blueprint struct {
 	ID          string

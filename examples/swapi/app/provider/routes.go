@@ -13,7 +13,7 @@ import (
 )
 
 // Routes wires application HTTP routes onto the *web.Server registered
-// by the web provider. hex make:controller inserts route
+// by the web provider. hex make controller inserts route
 // registrations above the `// hex:routes` marker below. Do not
 // remove the marker.
 //

@@ -10,7 +10,7 @@ import (
 
 // generatorProvider binds a domain/generator.Service into the container
 // as "generator", backed by the compiled-in blueprint templates
-// (infrastructure/embedfs). Every `hex make:*` command resolves it from
+// (infrastructure/embedfs). Every `hex make` command resolves it from
 // the container instead of constructing its own — the same pattern
 // hex/lua/provider uses for the shared Lua environment.
 type generatorProvider struct {

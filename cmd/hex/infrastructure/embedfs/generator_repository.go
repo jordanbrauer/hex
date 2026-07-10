@@ -1,8 +1,10 @@
 // Package embedfs is the built-in adapter for domain/generator: it
 // serves Blueprint definitions and template bytes from the CLI's own
-// compiled-in templates/help/mantemplates directories. It also exposes
-// the raw help text and man-page intros those directories carry, since
-// nothing else in the CLI touches these embeds.
+// compiled-in templates/mantemplates directories. It also exposes the
+// man-page intros the latter carries, since nothing else in the CLI
+// touches that embed. Per-command help text (long.md/example.sh) is
+// embedded directly by each command package instead of centralized
+// here.
 package embedfs
 
 import (
@@ -11,7 +13,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"strings"
 
 	"github.com/jordanbrauer/hex/cmd/hex/domain/generator"
 )
@@ -19,15 +20,12 @@ import (
 //go:embed all:templates
 var templatesFS embed.FS
 
-//go:embed all:help
-var helpFS embed.FS
-
 //go:embed mantemplates
 var manTemplatesFS embed.FS
 
-// blueprints are the built-in hex make:* generators, keyed by ID. Command
-// variants with conditional, multi-target wiring (make:command --group,
-// make:controller's route wiring) aren't modeled here — they render/wire
+// blueprints are the built-in hex make generators, keyed by ID. Command
+// variants with conditional, multi-target wiring (make command --group,
+// make controller's route wiring) aren't modeled here — they render/wire
 // through Service directly; see app/command.
 var blueprints = map[string]*generator.Blueprint{
 	"provider": {
@@ -147,29 +145,6 @@ func (Repository) Delete(_ context.Context, _ string) error {
 // Read returns the raw contents of an embedded template file.
 func (Repository) Read(_ context.Context, path string) ([]byte, error) {
 	return fs.ReadFile(templatesFS, path)
-}
-
-// HelpLong returns the embedded long description for a command key
-// (matching its Go source file, e.g. "make_provider").
-func HelpLong(key string) string {
-	return mustHelp(key + ".long.md")
-}
-
-// HelpExample returns the embedded example script for a command key.
-func HelpExample(key string) string {
-	return mustHelp(key + ".example.sh")
-}
-
-// mustHelp reads an embedded help file. The content is compiled into the
-// binary, so a missing file is a build-time bug and panics immediately
-// (surfaced the first time any command is constructed).
-func mustHelp(name string) string {
-	data, err := helpFS.ReadFile("help/" + name)
-	if err != nil {
-		panic(fmt.Sprintf("embedfs: missing embedded help file %q: %v", name, err))
-	}
-
-	return strings.TrimRight(string(data), "\n")
 }
 
 // ManTemplate returns an embedded hand-authored manpage prose block by

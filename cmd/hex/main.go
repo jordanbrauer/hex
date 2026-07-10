@@ -6,9 +6,9 @@
 // Usage:
 //
 //	hex init [name]              # scaffold a new project
-//	hex make:provider <name>     # generate a service provider
-//	hex make:domain <name>       # generate a domain package
-//	hex make:migration <name>    # generate up/down migration files
+//	hex make provider <name>     # generate a service provider
+//	hex make domain <name>       # generate a domain package
+//	hex make migration <name>    # generate up/down migration files
 //
 // Run without arguments to see the full command list.
 package main
@@ -18,29 +18,21 @@ import (
 	"os"
 
 	"github.com/jordanbrauer/hex"
-	hexcli "github.com/jordanbrauer/hex/cli"
-	hexlog "github.com/jordanbrauer/hex/log"
+	"github.com/jordanbrauer/hex/log"
 
 	"github.com/jordanbrauer/hex/cmd/hex/app"
 	"github.com/jordanbrauer/hex/cmd/hex/app/command"
 )
 
 func main() {
-	hexlog.Init()
-
+	ctx := context.Background()
 	kernel := hex.New()
 
-	if err := app.Boot(kernel); err != nil {
-		hexlog.Fatal("register providers", "error", err)
+	if err := app.Bootstrap(ctx, kernel); err != nil {
+		log.Fatal("boot", "error", err)
 	}
 
-	ctx := context.Background()
+	defer kernel.Shutdown(ctx)
 
-	if err := kernel.Bootstrap(ctx); err != nil {
-		hexlog.Fatal("bootstrap", "error", err)
-	}
-
-	defer func() { _ = kernel.Shutdown(ctx) }()
-
-	os.Exit(hexcli.Execute(command.Root(kernel)))
+	os.Exit(command.Execute(kernel))
 }

@@ -42,7 +42,7 @@ go get github.com/jordanbrauer/hex@latest
 ```
 
 You almost never do this by hand — `hex init` generates a `go.mod` with
-the right require line, and `hex make:*` adds any subpackages your
+the right require line, and `hex make` adds any subpackages your
 choices pull in.
 
 Scaffold a new project:
@@ -155,6 +155,11 @@ client.Get("/dashboard").
 
 Runnable example apps under [`examples/`](./examples):
 
+- [`examples/bare-hex-app`](./examples/bare-hex-app) — the structural
+  floor of a hex app: `main.go` and `app/` only — no config, no docs, no
+  dev tooling, no empty placeholder directories. A single `Lua`
+  provider backs the baseline `run`/`repl`/`version` commands every hex
+  app gets for free.
 - [`examples/swapi`](./examples/swapi) — a Star Wars API demo, scaffolded
   via `hex init`, serving the classic SWAPI dataset out of a SQLite file.
 - [`examples/ai-lua`](./examples/ai-lua) — a minimal app that boots

@@ -10,11 +10,15 @@ import (
 
 	"github.com/jordanbrauer/hex"
 	hexbuild "github.com/jordanbrauer/hex/build"
-	hexcli "github.com/jordanbrauer/hex/cli"
+	"github.com/jordanbrauer/hex/cli"
 	"github.com/jordanbrauer/hex/lua/plugin"
 	luaprovider "github.com/jordanbrauer/hex/lua/provider"
 
 	"github.com/jordanbrauer/hex/cmd/hex/app/build"
+	"github.com/jordanbrauer/hex/cmd/hex/app/command/genman"
+	initcmd "github.com/jordanbrauer/hex/cmd/hex/app/command/init"
+	makegroup "github.com/jordanbrauer/hex/cmd/hex/app/command/make"
+	"github.com/jordanbrauer/hex/cmd/hex/app/command/publish"
 )
 
 // commandPluginDir is where hex looks for repo-local command plugins
@@ -26,15 +30,21 @@ const commandPluginDir = ".hex/command"
 // heading in `hex --help`, separate from hex's built-in commands.
 var commandPluginGroup = plugin.Group{ID: "plugins", Title: "Plugins:"}
 
-// Root builds the top-level cobra command wired to app. hex make:command
+// Execute builds the command tree wired to app and runs it, returning the
+// process exit code. main is just os.Exit(command.Execute(kernel)).
+func Execute(app *hex.App) int {
+	return cli.Execute(Root(app))
+}
+
+// Root builds the top-level cobra command wired to app. hex make command
 // inserts subcommand registrations above the `// hex:commands` marker
 // below. Do not remove the marker.
 func Root(app *hex.App) *cobra.Command {
-	root := hexcli.Root(hexcli.RootOptions{
+	root := cli.Root(cli.RootOptions{
 		Name:  "hex",
 		Short: "Scaffolding CLI for hex applications",
 		Long: "hex is the scaffolding CLI for the hex Go framework.\n" +
-			"Create new projects with `hex init` and add code with `hex make:*`.",
+			"Create new projects with `hex init` and add code with `hex make`.",
 		App: app,
 	})
 	root.Version = hexVersion()
@@ -46,17 +56,16 @@ func Root(app *hex.App) *cobra.Command {
 	root.AddCommand(luaprovider.RunCommand(app))
 
 	root.AddCommand(
-		newInitCommand(app),
-		newPublishCommand(app),
-		newMakeProviderCommand(app),
-		newMakeDomainCommand(app),
-		newMakeMigrationCommand(app),
-		newMakeCommandCommand(app),
-		newMakeAdapterCommand(app),
-		newMakeControllerCommand(app),
-		newGenManCommand(),
+		initcmd.New(app),
+		publish.New(app),
+		makegroup.New(app),
 		// hex:commands
 	)
+
+	// gen-man introspects the tree above it was just given, so it's
+	// added last — by the time its RunE runs, root already has every
+	// other command (including gen-man itself) attached.
+	root.AddCommand(genman.New(root))
 
 	loadCommandPlugins(root)
 
