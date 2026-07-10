@@ -5,7 +5,7 @@ import "context"
 // Repository is the port to Blueprint definitions and the raw template
 // bytes they reference. The built-in blueprints are backed by
 // infrastructure/embedfs — the CLI's compiled-in templates. Store/Delete
-// exist so a future `hex make:blueprint` could let consumers register
+// exist so a future `hex make blueprint` could let consumers register
 // custom generators without writing Go code; the built-in adapter itself
 // need not support them.
 type Repository interface {

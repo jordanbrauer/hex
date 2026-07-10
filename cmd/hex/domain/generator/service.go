@@ -63,7 +63,7 @@ func (s *Service) Run(ctx context.Context, blueprintID, root string, data any, o
 // Apply renders bp's Files and applies its Wires against root, evaluating
 // every template string (Target, File, Marker, Insertion) against data.
 // Commands that need conditional files/wires beyond a static Blueprint
-// (make:controller's route wiring, make:command's group logic) call
+// (make controller's route wiring, make command's group logic) call
 // RenderFile/WireMarker/WireImport/PromoteImport directly instead.
 func (s *Service) Apply(ctx context.Context, bp *Blueprint, root string, data any, opts Options) ([]Action, error) {
 	var actions []Action

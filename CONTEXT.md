@@ -33,7 +33,7 @@ The interface that providers interact with during lifecycle hooks. Exposes conta
 _Avoid_: Context, kernel interface
 
 **Generator**:
-A `hex make:*` CLI command that produces correctly-placed source files following hex conventions.
+A `hex make` CLI command that produces correctly-placed source files following hex conventions.
 _Avoid_: Scaffold (when referring to a single file), template (that's what generators use internally)
 
 **Scaffold**:

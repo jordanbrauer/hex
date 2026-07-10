@@ -23,6 +23,11 @@ updates:
     schedule:
       interval: weekly
 
+  - package-ecosystem: gomod
+    directory: /examples/bare-hex-app
+    schedule:
+      interval: weekly
+
   # Keep the Actions pinned in ci.yml / release.yml current.
   - package-ecosystem: github-actions
     directory: /

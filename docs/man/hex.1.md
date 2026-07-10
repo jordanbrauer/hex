@@ -17,7 +17,7 @@ hex - scaffolding CLI for the hex application framework
 
 hex is an opinionated Go application framework and a companion CLI that
 scaffolds and extends applications built on it. The `init` command creates a
-complete, runnable project; the `make:*` generators add correctly-placed,
+complete, runnable project; the `make` generators add correctly-placed,
 correctly-wired code for providers, domains, migrations, commands, adapters,
 and controllers.
 
@@ -39,7 +39,7 @@ interfaces), `infrastructure/` (adapters that implement those ports),
 Generators auto-wire code by inserting above marker comments —
 `// hex:providers` in `app/boot.go`, `// hex:commands` in
 `app/command/root.go`, and `// hex:routes` in `app/provider/routes.go`. **Never
-remove these markers**; they are how `hex make:*` finds where to register new
+remove these markers**; they are how `hex make` finds where to register new
 code.
 
 # PLUGINS
@@ -65,7 +65,7 @@ the prompts and take the flag defaults instead.
 
 The generated project is runnable immediately: it wires an app kernel, a
 provider registry, config, logging, and an embedded Lua REPL, and drops the
-`// hex:*` marker comments that `hex make:*` uses to auto-wire new code.
+`// hex:*` marker comments that `hex make` uses to auto-wire new code.
 
 Developer tooling — `.editorconfig`, a `.golangci.yml` lint config, and a
 `.goreleaser.yaml` release config — is scaffolded by default. Opt out with
@@ -162,21 +162,31 @@ hex init myapp --lint=false --goreleaser=false --yes
 hex init myapp --github --yes
 ```
 
-## hex make:adapter
+## hex make
+
+Generate correctly-placed, correctly-wired code for a hex project
+
+Usage:
+
+```
+hex make
+```
+
+## hex make adapter
 
 Generate an infrastructure adapter at
 `infrastructure/<dialect>/<domain>_repository.go` — a stub implementation of
 `domain/<domain>.Repository` backed by the given SQL dialect.
 
 The generator produces `panic("not implemented")` stubs for the standard
-`Repository` methods (Store, Get, List, Delete) that `hex make:domain` scaffolds,
+`Repository` methods (Store, Get, List, Delete) that `hex make domain` scaffolds,
 plus a compile-time `var _ <domain>.Repository = (*…)(nil)` assertion. If you
 have extended the interface, add the extra methods by hand.
 
 Usage:
 
 ```
-hex make:adapter <domain> [flags]
+hex make adapter <domain> [flags]
 ```
 
 Options:
@@ -197,13 +207,13 @@ Examples:
 
 ```sh
 # A SQLite adapter for domain/order.Repository
-hex make:adapter order
+hex make adapter order
 
 # A Postgres adapter
-hex make:adapter order --dialect postgres
+hex make adapter order --dialect postgres
 ```
 
-## hex make:command
+## hex make command
 
 Generate a Cobra command wired into the application.
 
@@ -219,7 +229,7 @@ registrations.
 Usage:
 
 ```
-hex make:command <name> [flags]
+hex make command <name> [flags]
 ```
 
 Options:
@@ -240,16 +250,16 @@ Examples:
 
 ```sh
 # A top-level command: app/command/migrate.go, wired into root
-hex make:command migrate
+hex make command migrate
 
 # A grouped subcommand: app/command/user/create.go under a "user" group
-hex make:command create --group user
+hex make command create --group user
 
 # Preview the files and wiring
-hex make:command create --group user --dry-run
+hex make command create --group user --dry-run
 ```
 
-## hex make:controller
+## hex make controller
 
 Generate an HTTP controller at `app/controller/<name>.go` and wire its routes
 into `app/provider/routes.go` above the `// hex:routes` marker.
@@ -264,7 +274,7 @@ the `app/controller/` package already exist.
 Usage:
 
 ```
-hex make:controller <name> [flags]
+hex make controller <name> [flags]
 ```
 
 Options:
@@ -288,19 +298,19 @@ Examples:
 
 ```sh
 # A single Index handler + GET /users route
-hex make:controller users
+hex make controller users
 
 # Full RESTful CRUD
-hex make:controller users --all
+hex make controller users --all
 
 # A chosen subset of actions
-hex make:controller users --actions index,show,store
+hex make controller users --actions index,show,store
 
 # Preview the controller and route wiring without writing
-hex make:controller users --all --dry-run
+hex make controller users --all --dry-run
 ```
 
-## hex make:domain
+## hex make domain
 
 Generate a domain package at `domain/<name>/` containing the entity
 (`<name>.go`), the `Repository` port interface (`repository.go`), the `Service`
@@ -308,12 +318,12 @@ use-cases (`service.go`), and sentinel errors (`errors.go`).
 
 The name is normalised to a lower-case package name and a PascalCase type. The
 domain package depends on nothing outside itself — infrastructure implements the
-`Repository` port via `hex make:adapter`.
+`Repository` port via `hex make adapter`.
 
 Usage:
 
 ```
-hex make:domain <name> [flags]
+hex make domain <name> [flags]
 ```
 
 Options:
@@ -331,13 +341,13 @@ Examples:
 
 ```sh
 # Generate domain/order/{order,repository,service,errors}.go
-hex make:domain order
+hex make domain order
 
 # Preview the four files without writing them
-hex make:domain order --dry-run
+hex make domain order --dry-run
 ```
 
-## hex make:migration
+## hex make migration
 
 Generate a timestamped migration pair at
 `database/migrations/<timestamp>_<name>.{up,down}.sql`.
@@ -350,7 +360,7 @@ lexically sortable and unique to the second. When the name follows the
 Usage:
 
 ```
-hex make:migration <name> [flags]
+hex make migration <name> [flags]
 ```
 
 Options:
@@ -368,13 +378,13 @@ Examples:
 
 ```sh
 # create_users_table -> a CREATE TABLE users / DROP TABLE users pair
-hex make:migration create_users_table
+hex make migration create_users_table
 
 # A free-form migration name
-hex make:migration add_index_to_orders
+hex make migration add_index_to_orders
 ```
 
-## hex make:provider
+## hex make provider
 
 Generate a service provider at `app/provider/<name>.go` and wire it into
 `app/boot.go` above the `// hex:providers` marker.
@@ -386,7 +396,7 @@ the filename. The generated provider embeds `provider.Base`; add your bindings i
 Usage:
 
 ```
-hex make:provider <name> [flags]
+hex make provider <name> [flags]
 ```
 
 Options:
@@ -404,13 +414,13 @@ Examples:
 
 ```sh
 # Generate app/provider/payments.go and wire it into app/boot.go
-hex make:provider payments
+hex make provider payments
 
 # Preview what would be written and wired, without touching disk
-hex make:provider payments --dry-run
+hex make provider payments --dry-run
 
 # Machine-readable output for tooling / agents
-hex make:provider payments --dry-run --format json
+hex make provider payments --dry-run --format json
 ```
 
 ## hex publish

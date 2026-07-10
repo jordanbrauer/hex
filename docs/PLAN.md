@@ -17,7 +17,7 @@ hex extracts these patterns into a single, opinionated Go module with a companio
 hex follows the same playbook as Laravel (`artisan`), Phoenix (`mix phx.gen`), Hugo (`hugo new`), and Rails (`rails generate`):
 
 1. **`hex init`** scaffolds a complete, runnable project with the right directory structure, config files, Makefile, and wiring — ready to `go run` immediately.
-2. **`hex make:*`** generators produce correctly-placed, correctly-wired code for providers, domains, migrations, commands, and adapters — following hex conventions so every project looks the same.
+2. **`hex make`** generators produce correctly-placed, correctly-wired code for providers, domains, migrations, commands, and adapters — following hex conventions so every project looks the same.
 3. **The framework owns the architecture.** You don't decide where providers go or how config loads. hex decides. You write domain logic and CLI commands.
 
 ## Scope
@@ -56,7 +56,7 @@ hex follows the same playbook as Laravel (`artisan`), Phoenix (`mix phx.gen`), H
 | `hex/validate` | Struct/request validation via zog (Zod-style API) |
 | `hex/telemetry` | OpenTelemetry setup (tracer + metrics + log bridge) |
 | `hex/bdd` | BDD test runner via gobdd; Gherkin `.feature` support + embed.FS (ADR-0015) |
-| **`cmd/hex`** | **Scaffolding CLI (`hex init`, `hex make:*`)** |
+| **`cmd/hex`** | **Scaffolding CLI (`hex init`, `hex make`)** |
 
 ### Out of scope
 
@@ -77,11 +77,11 @@ These stay in consumer apps — they're app-specific, not framework-generic:
                          │     hex CLI tool     │
                          │                     │
                          │  hex init myapp     │──── scaffolds ────┐
-                         │  hex make:provider  │──── generates ────┤
-                         │  hex make:domain    │──── generates ────┤
-                         │  hex make:migration │──── generates ────┤
-                         │  hex make:command   │──── generates ────┤
-                         │  hex make:adapter   │──── generates ────┤
+                         │  hex make provider  │──── generates ────┤
+                         │  hex make domain    │──── generates ────┤
+                         │  hex make migration │──── generates ────┤
+                         │  hex make command   │──── generates ────┤
+                         │  hex make adapter   │──── generates ────┤
                          └─────────────────────┘                   │
                                                                    ▼
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -181,10 +181,10 @@ go run ./cmd/myapp
 # ✓ Running — boots providers, prints version, exits cleanly
 ```
 
-### `hex make:provider` — Generate a service provider
+### `hex make provider` — Generate a service provider
 
 ```bash
-hex make:provider cache
+hex make provider cache
 ```
 
 Generates `provider/cache.go`:
@@ -234,7 +234,7 @@ func Boot(app *hex.App) {
     )
 
     app.Register(
-        &Cache{},     // ← added by hex make:provider
+        &Cache{},     // ← added by hex make provider
     )
     // hex:providers
 }
@@ -242,10 +242,10 @@ func Boot(app *hex.App) {
 
 The generator finds the `// hex:providers` marker comment and inserts above it — same grouped `Register()` pattern used in CLI's `app/bootstrap.go` and bot's `bot/bootstrap.go` today.
 
-### `hex make:domain` — Generate a domain package
+### `hex make domain` — Generate a domain package
 
 ```bash
-hex make:domain token
+hex make domain token
 ```
 
 Generates a complete domain package following the hexagonal pattern:
@@ -261,10 +261,10 @@ domain/
 
 Each file follows hex conventions — domain depends on nothing outside itself.
 
-### `hex make:adapter` — Generate an infrastructure adapter
+### `hex make adapter` — Generate an infrastructure adapter
 
 ```bash
-hex make:adapter token --repo token.Repository --dialect sqlite
+hex make adapter token --repo token.Repository --dialect sqlite
 ```
 
 Generates `infrastructure/sqlite/token_repository.go`:
@@ -296,10 +296,10 @@ func (r *TokenRepository) Store(ctx context.Context, t *token.Token) error {
 // ... stubs for all Repository interface methods
 ```
 
-### `hex make:migration` — Generate a migration
+### `hex make migration` — Generate a migration
 
 ```bash
-hex make:migration create_tokens_table
+hex make migration create_tokens_table
 ```
 
 Generates timestamped migration files:
@@ -324,10 +324,10 @@ CREATE TABLE IF NOT EXISTS tokens (
 DROP TABLE IF EXISTS tokens;
 ```
 
-### `hex make:command` — Generate a CLI command
+### `hex make command` — Generate a CLI command
 
 ```bash
-hex make:command token list
+hex make command token list
 ```
 
 Generates `cli/token/list.go`:
@@ -369,11 +369,11 @@ Generates an event handler file with the subscribe wiring.
 | Command | What it generates | Auto-wires |
 |---------|-------------------|------------|
 | `hex init <name>` | Full project skeleton | Everything — ready to `go run` |
-| `hex make:provider <name>` | `provider/<name>.go` | Adds to `provider/boot.go` |
-| `hex make:domain <name>` | `domain/<name>/` (entity, repo, service, errors) | Nothing — pure domain |
-| `hex make:adapter <name>` | `infrastructure/<dialect>/<name>_repository.go` | Nothing — wire in provider |
-| `hex make:migration <name>` | `db/migrations/<ts>_<name>.{up,down}.sql` | Nothing — auto-discovered by embed.FS |
-| `hex make:command <group> <name>` | `cli/<group>/<name>.go` | Adds to parent command group |
+| `hex make provider <name>` | `provider/<name>.go` | Adds to `provider/boot.go` |
+| `hex make domain <name>` | `domain/<name>/` (entity, repo, service, errors) | Nothing — pure domain |
+| `hex make adapter <name>` | `infrastructure/<dialect>/<name>_repository.go` | Nothing — wire in provider |
+| `hex make migration <name>` | `db/migrations/<ts>_<name>.{up,down}.sql` | Nothing — auto-discovered by embed.FS |
+| `hex make command <group> <name>` | `cli/<group>/<name>.go` | Adds to parent command group |
 | `hex make:event <name>` | Event handler file | Adds subscriber registration |
 
 ### Template engine
@@ -388,7 +388,7 @@ No external template dependencies. Templates are embedded at compile time.
 
 ### Project detection
 
-All `hex make:*` commands detect the project root by walking up from cwd looking for `go.mod` with a hex dependency. This means you can run generators from any subdirectory.
+All `hex make` commands detect the project root by walking up from cwd looking for `go.mod` with a hex dependency. This means you can run generators from any subdirectory.
 
 The hex CLI reads the module path from `go.mod` to generate correct import paths in scaffolded code.
 
@@ -850,12 +850,12 @@ hex/
 │   └── hex/                    # ← the scaffolding CLI binary
 │       ├── main.go
 │       ├── init.go             # hex init command
-│       ├── make.go             # hex make:* parent command
-│       ├── make_provider.go    # hex make:provider
-│       ├── make_domain.go      # hex make:domain
-│       ├── make_migration.go   # hex make:migration
-│       ├── make_command.go     # hex make:command
-│       ├── make_adapter.go     # hex make:adapter
+│       ├── make.go             # hex make parent command
+│       ├── make_provider.go    # hex make provider
+│       ├── make_domain.go      # hex make domain
+│       ├── make_migration.go   # hex make migration
+│       ├── make_command.go     # hex make command
+│       ├── make_adapter.go     # hex make adapter
 │       ├── make_event.go       # hex make:event
 │       ├── project.go          # Project detection (find go.mod, parse module path)
 │       ├── generator.go        # Template engine (load, render, write, wire)
@@ -1024,11 +1024,11 @@ The scaffolding CLI itself. This is the user-facing `hex` binary that generates 
 | Command | Priority | Complexity |
 |---------|----------|------------|
 | `hex init` | P0 — must ship first | Medium (full project scaffold) |
-| `hex make:provider` | P0 | Low (single file + boot.go wire) |
-| `hex make:domain` | P0 | Low (4 files, no wiring) |
-| `hex make:migration` | P0 | Trivial (timestamped SQL stubs) |
-| `hex make:command` | P1 | Medium (parent group detection) |
-| `hex make:adapter` | P1 | Medium (reads interface, generates stubs) |
+| `hex make provider` | P0 | Low (single file + boot.go wire) |
+| `hex make domain` | P0 | Low (4 files, no wiring) |
+| `hex make migration` | P0 | Trivial (timestamped SQL stubs) |
+| `hex make command` | P1 | Medium (parent group detection) |
+| `hex make adapter` | P1 | Medium (reads interface, generates stubs) |
 | `hex make:event` | P2 | Medium (subscriber wiring) |
 
 **Tests:** Golden file tests — run each generator, compare output against checked-in snapshots. `UPDATE_SNAPSHOTS=true go test ./...` to refresh.

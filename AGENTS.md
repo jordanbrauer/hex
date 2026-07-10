@@ -123,7 +123,7 @@ closure that resolves the dependency lazily on first call.
 
 ### Scaffolder marker comments
 
-The `cmd/hex/make:*` generators insert new registrations above magic
+The `hex make` generators insert new registrations above magic
 comments in the scaffolded app's tree:
 
 - `// hex:providers` in `app/boot.go`

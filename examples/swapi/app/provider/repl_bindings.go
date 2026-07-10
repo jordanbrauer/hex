@@ -33,7 +33,7 @@ import (
 //
 // The commented example below exposes a `users` module backed by a
 // hypothetical UserService. Uncomment + adapt as your codebase grows.
-// hex make:domain will insert new bindings above the `// hex:repl`
+// hex make domain will insert new bindings above the `// hex:repl`
 // marker; do not remove the marker.
 func ReplBindings() provider.Service {
 	return &replBindings{}

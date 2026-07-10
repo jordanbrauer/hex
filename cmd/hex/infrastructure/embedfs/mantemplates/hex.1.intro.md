@@ -17,7 +17,7 @@ hex - scaffolding CLI for the hex application framework
 
 hex is an opinionated Go application framework and a companion CLI that
 scaffolds and extends applications built on it. The `init` command creates a
-complete, runnable project; the `make:*` generators add correctly-placed,
+complete, runnable project; the `make` generators add correctly-placed,
 correctly-wired code for providers, domains, migrations, commands, adapters,
 and controllers.
 
@@ -39,7 +39,7 @@ interfaces), `infrastructure/` (adapters that implement those ports),
 Generators auto-wire code by inserting above marker comments —
 `// hex:providers` in `app/boot.go`, `// hex:commands` in
 `app/command/root.go`, and `// hex:routes` in `app/provider/routes.go`. **Never
-remove these markers**; they are how `hex make:*` finds where to register new
+remove these markers**; they are how `hex make` finds where to register new
 code.
 
 # PLUGINS

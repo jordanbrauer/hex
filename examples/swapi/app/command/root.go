@@ -5,24 +5,30 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/jordanbrauer/hex"
-	hexcli "github.com/jordanbrauer/hex/cli"
+	"github.com/jordanbrauer/hex/cli"
 	luaprovider "github.com/jordanbrauer/hex/lua/provider"
 	webprovider "github.com/jordanbrauer/hex/web/provider"
 
 	"github.com/jordanbrauer/hex/examples/swapi/app/build"
 )
 
-// Root builds the top-level cobra command wired to app. hex make:command
+// Execute builds the command tree wired to app and runs it, returning the
+// process exit code. main is just os.Exit(command.Execute(kernel)).
+func Execute(app *hex.App) int {
+	return cli.Execute(Root(app))
+}
+
+// Root builds the top-level cobra command wired to app. hex make command
 // inserts subcommand registrations above the `// hex:commands` marker
 // below. Do not remove the marker.
 func Root(app *hex.App) *cobra.Command {
-	root := hexcli.Root(hexcli.RootOptions{
+	root := cli.Root(cli.RootOptions{
 		Name:  "swapi",
 		Short: "swapi",
 		App:   app,
 	})
 
-	root.AddCommand(hexcli.Version(hexcli.VersionOptions{
+	root.AddCommand(cli.Version(cli.VersionOptions{
 		App: build.Info().Name,
 	}))
 
