@@ -138,17 +138,21 @@ just test           # go test ./...
 just race           # go test -race ./...
 just cover          # HTML coverage report
 just fmt            # gofmt -s -w .
-just fmt-check      # fail if anything would change
 just vet            # go vet ./...
-just lint           # golangci-lint (see .golangci.yml)
-just check          # fmt-check + lint + vet + race — the pre-commit gate
+just lint           # fmt-check + man-check (manpage drift) + golangci-lint
+just check          # lint + vet + race — the pre-commit gate
 just tidy           # go mod tidy
 just clean          # remove coverage + testcache
 ```
 
-Every PR must pass `just check` before merging. CI mirrors this gate:
-`qa` (gofmt + vet + golangci-lint) and `build` run in parallel; `test`
-(race-enabled) only runs if both upstream jobs pass.
+`fmt-check` and `man-check` are `[private]` recipes — helpers folded
+into `lint`, not meant to be run standalone in normal workflow (though
+`just fmt-check` / `just man-check` still work directly).
+
+Every PR must pass `just check` before merging. CI mirrors this gate
+across four jobs: `qa` (gofmt + vet + golangci-lint) and `docs`
+(manpage markdown must match the command tree) run in parallel with
+`build`; `test` (race-enabled) only runs if `qa` and `build` both pass.
 
 ## Known flaky tests
 

@@ -4,6 +4,10 @@ Thanks for wanting to contribute. This document is the human-facing
 counterpart to [`AGENTS.md`](./AGENTS.md) (which is the same content
 compressed for AI coding agents).
 
+By participating, you're expected to uphold the
+[Code of Conduct](./CODE_OF_CONDUCT.md). Found a security issue? See
+[`SECURITY.md`](./SECURITY.md) instead of opening a public issue.
+
 ## Before you start
 
 1. Read [`CONTEXT.md`](./CONTEXT.md) — hex has a strict vocabulary for
@@ -37,13 +41,15 @@ just fmt            # gofmt -s -w .
 just fmt-check      # fail if anything would change
 just vet            # go vet ./...
 just lint           # golangci-lint (see .golangci.yml)
-just check          # fmt-check + lint + vet + race — the pre-commit gate
+just check          # lint (fmt-check + man-check + golangci-lint) + vet + race — the pre-commit gate
 just tidy           # go mod tidy
 ```
 
-Every PR must pass `just check`. CI runs the same gate: `qa` (gofmt +
-vet + golangci-lint) and `build` in parallel, then `test` (race-enabled)
-after both succeed.
+Every PR must pass `just check`. CI runs the same gate across four
+jobs: `qa` (gofmt + vet + golangci-lint) and `docs` (manpage markdown
+must match the command tree — see `just man-check`) run in parallel
+with `build`; `test` (race-enabled) runs only after `qa` and `build`
+both succeed.
 
 ## Requirements
 

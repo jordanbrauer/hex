@@ -1,0 +1,28 @@
+# https://git-scm.com/docs/gitattributes
+
+# Default: normalize line endings to LF in the repo, let git decide
+# checkout behavior per-platform.
+* text=auto eol=lf
+
+# Never normalize binary-ish or intentionally-CRLF-agnostic assets.
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.sqlite binary
+*.sql text eol=lf
+
+# Go source and templates always LF, even on Windows checkouts.
+*.go text eol=lf
+*.gotmpl text eol=lf
+*.tmpl text eol=lf
+
+# Vendored, unmodified upstream source — exclude from GitHub's language
+# stats and diffs. See lua/fennel/NOTICE.md.
+lua/fennel/fennel.lua linguist-vendored
+lua/fennel/fennel.lua -diff
+
+# Generated manpage markdown — source of truth is the command tree +
+# help files, not hand-edited. Keep it out of language stats and PR
+# diff review noise (still tracked; just not linted as prose).
+docs/man/*.md linguist-generated

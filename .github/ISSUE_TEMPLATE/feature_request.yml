@@ -1,0 +1,47 @@
+name: Feature request
+description: Propose a new package, provider, generator, or CLI capability.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before filing, check `docs/PLAN.md` (package roster/scope) and
+        `docs/FOLLOWUPS.md` (deferred subsystems) — your idea may
+        already be tracked there.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: What are you trying to do that hex doesn't support today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: |
+        Sketch the API, config shape, or CLI flag you have in mind.
+        Doesn't need to be final — a starting point is enough.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other approaches, workarounds, or existing packages you've tried.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - New framework package
+        - Change to an existing package
+        - cmd/hex (scaffolder / generators)
+        - Documentation
+        - Other
+    validations:
+      required: true
