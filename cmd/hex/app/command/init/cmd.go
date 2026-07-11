@@ -9,9 +9,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"os/user"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
@@ -23,6 +25,7 @@ import (
 	webprovider "github.com/jordanbrauer/hex/web/provider"
 
 	"github.com/jordanbrauer/hex"
+	"github.com/jordanbrauer/hex/build"
 	"github.com/jordanbrauer/hex/cmd/hex/domain/generator"
 )
 
@@ -324,6 +327,11 @@ func resolveInitConfig(args []string, f resolveFlags) (initConfig, error) {
 	}
 
 	cfg.GoVersion = runningGoVersion()
+
+	if cfg.HexVersion == "" {
+		cfg.HexVersion = hexRequireVersion()
+	}
+
 	cfg.applyToolingDefaults()
 
 	if f.yes {
@@ -954,4 +962,43 @@ func defaultModulePath(name string) string {
 
 func runningGoVersion() string {
 	return "1.26"
+}
+
+// fallbackHexVersion is the last-resort require version used when neither
+// the running CLI's own build version nor a proxy lookup is available
+// (e.g. fully offline dev builds). Bump when cutting a new release.
+const fallbackHexVersion = "v0.0.1"
+
+// hexRequireVersion returns the hex library version to require in a
+// scaffolded go.mod. It mirrors the running CLI's own build version, since
+// cmd/hex and the hex library are versioned together from the same tag.
+//
+// Dev builds (no ldflags, no module version — e.g. `go run ./cmd/hex`) have
+// no build version to mirror, so we ask the Go toolchain for the latest
+// published version instead. "latest" is not itself valid go.mod syntax, so
+// it must be resolved to a concrete version here rather than written as-is.
+func hexRequireVersion() string {
+	if v := build.Version(); v != build.UnknownVersion {
+		return v
+	}
+
+	if v, err := latestPublishedHexVersion(); err == nil && v != "" {
+		return v
+	}
+
+	return fallbackHexVersion
+}
+
+// latestPublishedHexVersion shells out to `go list` to resolve the newest
+// version of the hex module known to the configured module proxy.
+func latestPublishedHexVersion() (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	out, err := exec.CommandContext(ctx, "go", "list", "-m", "-f", "{{.Version}}", "github.com/jordanbrauer/hex@latest").Output()
+	if err != nil {
+		return "", err
+	}
+
+	return strings.TrimSpace(string(out)), nil
 }

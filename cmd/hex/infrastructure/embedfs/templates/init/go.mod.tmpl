@@ -3,7 +3,7 @@ module {{.ModulePath}}
 go {{.GoVersion}}
 
 require (
-	github.com/jordanbrauer/hex v0.0.0
+	github.com/jordanbrauer/hex {{.HexVersion}}
 	github.com/spf13/cobra v1.10.2
 {{- if eq .Dialect "sqlite" }}
 	modernc.org/sqlite v1.53.0
