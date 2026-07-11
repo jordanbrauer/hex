@@ -5,13 +5,13 @@
 class Hex < Formula
   desc "An opinionated Go application framework."
   homepage "https://github.com/jordanbrauer/hex"
-  version "0.0.1-alpha"
+  version "0.0.2-alpha"
   license "MIT"
 
   on_macos do
     if Hardware::CPU.intel?
-      url "https://github.com/jordanbrauer/hex/releases/download/v0.0.1-alpha/hex_0.0.1-alpha_darwin_x86_64.tar.gz"
-      sha256 "04f1bc8aa702a7bc04bad2b8a2eac45a4038498495846c4a4d3fc1e50a196f80"
+      url "https://github.com/jordanbrauer/hex/releases/download/v0.0.2-alpha/hex_0.0.2-alpha_darwin_x86_64.tar.gz"
+      sha256 "ec32cf351fd9e18def723476785972a549423df80054d487d28fb3dfe6d22e39"
 
       define_method(:install) do
         bin.install "hex"
@@ -22,8 +22,8 @@ class Hex < Formula
       end
     end
     if Hardware::CPU.arm?
-      url "https://github.com/jordanbrauer/hex/releases/download/v0.0.1-alpha/hex_0.0.1-alpha_darwin_arm64.tar.gz"
-      sha256 "c819dda61e494fb88db2e958a65d8f2633cdd9755b4e0fc748d8a1a4ffe5a72a"
+      url "https://github.com/jordanbrauer/hex/releases/download/v0.0.2-alpha/hex_0.0.2-alpha_darwin_arm64.tar.gz"
+      sha256 "edf0a1152539682cc6a85a8fe6e34ca0589031823398462f51e7586c1376f5ef"
 
       define_method(:install) do
         bin.install "hex"
@@ -37,8 +37,8 @@ class Hex < Formula
 
   on_linux do
     if Hardware::CPU.intel? && Hardware::CPU.is_64_bit?
-      url "https://github.com/jordanbrauer/hex/releases/download/v0.0.1-alpha/hex_0.0.1-alpha_linux_x86_64.tar.gz"
-      sha256 "77897d6be7752448a788c518037f1cc3a1ceacaae27ec2c71046c6c39057fdce"
+      url "https://github.com/jordanbrauer/hex/releases/download/v0.0.2-alpha/hex_0.0.2-alpha_linux_x86_64.tar.gz"
+      sha256 "9514baf92496bc69229fbf373f3f834f633a3e37afe5df90d8522a31edc998cd"
       define_method(:install) do
         bin.install "hex"
         man1.install "man/hex.1"
@@ -48,8 +48,8 @@ class Hex < Formula
       end
     end
     if Hardware::CPU.arm? && Hardware::CPU.is_64_bit?
-      url "https://github.com/jordanbrauer/hex/releases/download/v0.0.1-alpha/hex_0.0.1-alpha_linux_arm64.tar.gz"
-      sha256 "b86fc6e48e080e0de3306d9d3787dcb8c502faffe1b0b73836eb220fcdfba7c8"
+      url "https://github.com/jordanbrauer/hex/releases/download/v0.0.2-alpha/hex_0.0.2-alpha_linux_arm64.tar.gz"
+      sha256 "867aff3a2c07ecf7d3ce82a1b0fe5e9d5a5efdca8faec6cf6539df20b7bc1577"
       define_method(:install) do
         bin.install "hex"
         man1.install "man/hex.1"
