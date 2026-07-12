@@ -9,11 +9,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"os/user"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
@@ -328,8 +326,14 @@ func resolveInitConfig(args []string, f resolveFlags) (initConfig, error) {
 
 	cfg.GoVersion = runningGoVersion()
 
+	// The hex library and cmd/hex share one module, so whatever version
+	// built this binary is the version a scaffolded app should require.
+	// build.Version() already has its own fallback ("dev") for builds with
+	// no VCS info; go.mod parsing will reject that non-version string, so
+	// `go mod tidy` fails loudly and tells the user to fix it — better
+	// than this command guessing a possibly-wrong pinned version.
 	if cfg.HexVersion == "" {
-		cfg.HexVersion = hexRequireVersion()
+		cfg.HexVersion = build.Version()
 	}
 
 	cfg.applyToolingDefaults()
@@ -962,43 +966,4 @@ func defaultModulePath(name string) string {
 
 func runningGoVersion() string {
 	return "1.26"
-}
-
-// fallbackHexVersion is the last-resort require version used when neither
-// the running CLI's own build version nor a proxy lookup is available
-// (e.g. fully offline dev builds). Bump when cutting a new release.
-const fallbackHexVersion = "v0.0.1"
-
-// hexRequireVersion returns the hex library version to require in a
-// scaffolded go.mod. It mirrors the running CLI's own build version, since
-// cmd/hex and the hex library are versioned together from the same tag.
-//
-// Dev builds (no ldflags, no module version — e.g. `go run ./cmd/hex`) have
-// no build version to mirror, so we ask the Go toolchain for the latest
-// published version instead. "latest" is not itself valid go.mod syntax, so
-// it must be resolved to a concrete version here rather than written as-is.
-func hexRequireVersion() string {
-	if v := build.Version(); v != build.UnknownVersion {
-		return v
-	}
-
-	if v, err := latestPublishedHexVersion(); err == nil && v != "" {
-		return v
-	}
-
-	return fallbackHexVersion
-}
-
-// latestPublishedHexVersion shells out to `go list` to resolve the newest
-// version of the hex module known to the configured module proxy.
-func latestPublishedHexVersion() (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	out, err := exec.CommandContext(ctx, "go", "list", "-m", "-f", "{{.Version}}", "github.com/jordanbrauer/hex@latest").Output()
-	if err != nil {
-		return "", err
-	}
-
-	return strings.TrimSpace(string(out)), nil
 }

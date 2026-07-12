@@ -68,6 +68,26 @@ If hex CLI ever ships codesigned + notarised binaries, migrate the
 release pipeline to `homebrew_casks:` in `.goreleaser.yaml` and drop
 this workaround.
 
+## Versioning the library in scaffolded apps
+
+`cmd/hex` and the `hex` library live in one module, so whatever tag
+built the running CLI binary *is* the library version it should put
+in a scaffolded app's `go.mod`. `hex init` sets that require line to
+`build.Version()` (`cmd/hex/app/command/init/cmd.go`) — the same value
+`hex --version` reports.
+
+Release binaries get that from GoReleaser's `-ldflags`. Plain `go
+build`/`go install` inside a git checkout get it for free from
+`debug.BuildInfo`'s automatic VCS stamping (Go 1.18+), which derives a
+real pseudo-version from the nearest tag with no ldflags needed. The
+only builds without a usable version are ones with no VCS info at all
+(e.g. built from a stripped source tarball) — `build.Version()` falls
+back to `"dev"` there, which is not valid go.mod syntax, so `go mod
+tidy` on the scaffolded project fails loudly and tells the user to
+pin a real version by hand. That's the right outcome: this is an
+unusual, self-inflicted build setup, not something `hex init` should
+paper over by guessing a version that might be wrong.
+
 ## Godoc indexing
 
 pkg.go.dev doesn't have a publish step — it indexes whatever version
