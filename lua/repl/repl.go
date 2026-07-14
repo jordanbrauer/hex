@@ -17,6 +17,8 @@ package repl
 
 import (
 	"bufio"
+	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -137,6 +139,38 @@ type Options struct {
 	//     the caller is responsible for detecting one (typically
 	//     via golang.org/x/term or mattn/go-isatty on os.Stdin).
 	Interactive bool
+}
+
+// Eval evaluates one line against env in mode, for hosts embedding a
+// console — a TUI pane, a socket endpoint — without Run's interactive
+// loop. Lua print() output and expression results (tables rendered
+// via the same tabulate grid the REPL uses) land in output, in order.
+// incomplete reports syntactically unfinished input (an unclosed
+// block, paren, or table) that the host should buffer and resubmit
+// joined with the next line; output and err are empty in that case.
+// Errors come back trimmed of gopher-lua's stack traceback, one-liner
+// style, matching the interactive loop.
+//
+// Teal evaluates sessionless — declarations do not persist across
+// lines. Hosts wanting a persistent Teal session should use Run.
+func Eval(env *hexlua.Environment, mode Mode, line string) (output string, incomplete bool, err error) {
+	var buf bytes.Buffer
+
+	prev := env.Stdout()
+	env.SetStdout(&buf)
+	defer env.SetStdout(prev)
+
+	lang := mode.toLanguage()
+
+	if evalErr := evalLine(env, &buf, line, lang, nil); evalErr != nil {
+		if isIncompleteError(evalErr, lang) {
+			return "", true, nil
+		}
+
+		return buf.String(), false, errors.New(trimTraceback(evalErr.Error()))
+	}
+
+	return buf.String(), false, nil
 }
 
 // Run executes the read-eval-print loop with the given options and
