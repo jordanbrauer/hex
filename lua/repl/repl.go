@@ -152,8 +152,88 @@ type Options struct {
 // style, matching the interactive loop.
 //
 // Teal evaluates sessionless — declarations do not persist across
-// lines. Hosts wanting a persistent Teal session should use Run.
+// lines. Hosts wanting Run-equivalent cross-line persistence use
+// NewConsole instead.
 func Eval(env *hexlua.Environment, mode Mode, line string) (output string, incomplete bool, err error) {
+	return eval(env, nil, mode, line)
+}
+
+// Console is a persistent embedded evaluation session: Eval with the
+// same cross-line state Run's interactive loop keeps. Fennel and Lua
+// persistence comes from the shared environment itself (globals
+// survive, chunk-locals die — standard Lua semantics, identical to
+// Run); Teal additionally gets a persistent tl session, with the
+// environment's registered type stubs propagated and each typed
+// module pre-declared as a global, exactly as Run sets up.
+//
+// Close releases the Teal session. The environment is the caller's —
+// Console never closes it.
+type Console struct {
+	env     *hexlua.Environment
+	mode    Mode
+	session *teal.Session
+}
+
+// NewConsole builds a Console over env in mode. Teal mode loads the
+// tl compiler and mints the persistent session up front; Fennel and
+// Lua need no extra state.
+func NewConsole(env *hexlua.Environment, mode Mode) (*Console, error) {
+	console := &Console{env: env, mode: mode}
+
+	if mode != ModeTeal {
+		return console, nil
+	}
+
+	if err := teal.Load(env.L); err != nil {
+		return nil, fmt.Errorf("repl: load teal: %w", err)
+	}
+
+	session, err := teal.NewSession(env.L)
+	if err != nil {
+		return nil, fmt.Errorf("repl: teal session: %w", err)
+	}
+
+	types := env.Types()
+	for name, source := range types {
+		if err := session.AddTypeStub(name, source); err != nil {
+			session.Close()
+
+			return nil, fmt.Errorf("repl: register type %q: %w", name, err)
+		}
+	}
+
+	if err := preloadTypedGlobals(env, session, types); err != nil {
+		session.Close()
+
+		return nil, fmt.Errorf("repl: preload globals: %w", err)
+	}
+
+	console.session = session
+
+	return console, nil
+}
+
+// Eval evaluates one line, with the same contract as the package
+// Eval function.
+func (c *Console) Eval(line string) (output string, incomplete bool, err error) {
+	return eval(c.env, c.session, c.mode, line)
+}
+
+// Mode returns the console's evaluation mode.
+func (c *Console) Mode() Mode { return c.mode }
+
+// Close releases the Teal session, when one exists.
+func (c *Console) Close() error {
+	if c.session != nil {
+		c.session.Close()
+		c.session = nil
+	}
+
+	return nil
+}
+
+// eval is the shared body behind Eval and Console.Eval.
+func eval(env *hexlua.Environment, session *teal.Session, mode Mode, line string) (string, bool, error) {
 	var buf bytes.Buffer
 
 	prev := env.Stdout()
@@ -162,7 +242,7 @@ func Eval(env *hexlua.Environment, mode Mode, line string) (output string, incom
 
 	lang := mode.toLanguage()
 
-	if evalErr := evalLine(env, &buf, line, lang, nil); evalErr != nil {
+	if evalErr := evalLine(env, &buf, line, lang, session); evalErr != nil {
 		if isIncompleteError(evalErr, lang) {
 			return "", true, nil
 		}
