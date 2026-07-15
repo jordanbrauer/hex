@@ -149,7 +149,7 @@ func TestCompleter_endToEnd(t *testing.T) {
 	env.L.SetField(tbl, "queryOne", env.L.NewFunction(func(*glua.LState) int { return 0 }))
 	env.L.SetGlobal("db", tbl)
 
-	comp := completer(env)
+	comp := Completer(env)
 
 	// "db.q" cursor at 4 → should return {query, queryOne} with prefixStart=3.
 	cands, prefixStart := comp("teal", "db.q", 4)

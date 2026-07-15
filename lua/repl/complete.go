@@ -10,7 +10,7 @@ import (
 	tuirepl "github.com/jordanbrauer/hex/tui/components/repl"
 )
 
-// completer returns a tuirepl.Completer that inspects the Lua state's
+// Completer returns a tuirepl.Completer that inspects the Lua state's
 // globals table to enumerate candidates. Called on every Tab key
 // press in the interactive REPL.
 //
@@ -26,7 +26,12 @@ import (
 //
 // Only string keys on the receiver table are candidates. Numeric
 // keys, metatables, and special __index values are ignored (v1).
-func completer(env *hexlua.Environment) tuirepl.Completer {
+//
+// Exported so embedders of tui/components/repl.Model (e.g. an app's
+// own Bubble Tea dashboard wanting the same completion the CLI REPL
+// gets) can wire it up without reimplementing globals/member
+// introspection.
+func Completer(env *hexlua.Environment) tuirepl.Completer {
 	return func(mode, input string, cursorPos int) ([]tuirepl.Candidate, int) {
 		if cursorPos > len(input) {
 			cursorPos = len(input)
