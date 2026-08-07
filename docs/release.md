@@ -73,8 +73,9 @@ this workaround.
 `cmd/hex` and the `hex` library live in one module, so whatever tag
 built the running CLI binary *is* the library version it should put
 in a scaffolded app's `go.mod`. `hex init` sets that require line to
-`build.Version()` (`cmd/hex/app/command/init/cmd.go`) — the same value
-`hex --version` reports.
+`build.Version()` (`cmd/hex/app/command/init/cmd.go`) — normalized with a
+leading `v` when necessary for valid Go module version syntax. `hex --version`
+reports the unmodified build value.
 
 Release binaries get that from GoReleaser's `-ldflags`. Plain `go
 build`/`go install` inside a git checkout get it for free from
@@ -82,11 +83,12 @@ build`/`go install` inside a git checkout get it for free from
 real pseudo-version from the nearest tag with no ldflags needed. The
 only builds without a usable version are ones with no VCS info at all
 (e.g. built from a stripped source tarball) — `build.Version()` falls
-back to `"dev"` there, which is not valid go.mod syntax, so `go mod
-tidy` on the scaffolded project fails loudly and tells the user to
-pin a real version by hand. That's the right outcome: this is an
-unusual, self-inflicted build setup, not something `hex init` should
-paper over by guessing a version that might be wrong.
+back to `"dev"` there, which is not a valid semantic version. Normalization
+therefore produces `vdev`, which remains invalid go.mod syntax, so `go mod
+tidy` on the scaffolded project fails loudly and tells the user to pin a real
+version by hand. That's the right outcome: this is an unusual, self-inflicted
+build setup, not something `hex init` should paper over by guessing a version
+that might be wrong.
 
 ## Godoc indexing
 

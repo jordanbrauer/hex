@@ -328,12 +328,10 @@ func resolveInitConfig(args []string, f resolveFlags) (initConfig, error) {
 
 	// The hex library and cmd/hex share one module, so whatever version
 	// built this binary is the version a scaffolded app should require.
-	// build.Version() already has its own fallback ("dev") for builds with
-	// no VCS info; go.mod parsing will reject that non-version string, so
-	// `go mod tidy` fails loudly and tells the user to fix it — better
-	// than this command guessing a possibly-wrong pinned version.
+	// Go module versions require a leading "v"; release builds may inject
+	// the version without it.
 	if cfg.HexVersion == "" {
-		cfg.HexVersion = build.Version()
+		cfg.HexVersion = goModuleVersion(build.Version())
 	}
 
 	cfg.applyToolingDefaults()
@@ -962,6 +960,12 @@ func defaultModulePath(name string) string {
 	}
 
 	return "github.com/" + u.Username + "/" + name
+}
+
+// goModuleVersion formats a Hex release version for a go.mod require
+// directive. build.Version may be supplied with or without the leading "v".
+func goModuleVersion(version string) string {
+	return "v" + strings.TrimPrefix(version, "v")
 }
 
 func runningGoVersion() string {
